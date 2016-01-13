@@ -5,8 +5,11 @@ import (
     "net"
     "os"
 )
-func main() {
-    if len(os.Args) != 2 {
+func main(){
+   clientMain();
+}
+func clientMain(){
+if len(os.Args) != 2 {
         fmt.Fprintf(os.Stderr, "Usage: %s host:port ", os.Args[0])
         os.Exit(1)
     }
@@ -18,7 +21,6 @@ func main() {
     _, err = conn.Write([]byte("HEAD / HTTP/1.0\r\n\r\n"))
     checkError("3",err)
     result, err := ioutil.ReadAll(conn)
-   
     fmt.Println(string(result))
     os.Exit(0)
 }

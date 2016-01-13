@@ -1,26 +1,28 @@
 package main
-
 import (
     "fmt"
     "net"
     "os"
 )
-func main() {
-    service := ":8080"
-    tcpAddr,err := net.ResolveTCPAddr("tcp", service)
+func main(){
+     serverMain()
+}
+func serverMain(){
+    service:=":8080"
+    tcpAddr,err:= net.ResolveTCPAddr("tcp",service)
     checkError(err)
     listener,err := net.ListenTCP("tcp",tcpAddr)
     checkError(err)
     for {
         conn, err := listener.Accept()
-        if err != nil {
+        if err!= nil {
             continue
         }
         sss := "Hello"
 	fmt.Println("Hello")
         conn.Write([]byte(sss))
 fmt.Println("Hello")
-        conn.Close()                // we're finished with this client
+        conn.Close()              
     }
 }
 func checkError(err error) {
@@ -29,3 +31,4 @@ func checkError(err error) {
 		os.Exit(1)
 	}
 }
+
