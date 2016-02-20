@@ -10,7 +10,6 @@ import (
 	"testing"
 )
 
-
 // Simple serial check of getting and setting
 func TestTCPSimple(t *testing.T) {
    	go serverMain()
@@ -23,7 +22,7 @@ func TestTCPSimple(t *testing.T) {
 		t.Error(err.Error()) // report error through testing framework
 	}
 
-//--------------Simple testcases---------
+//---------------------------Simple testcases---------
 
 	scanner := bufio.NewScanner(conn)
 	// Write a file
@@ -48,8 +47,33 @@ func TestTCPSimple(t *testing.T) {
 		t.Error("Non-numeric version found")
 	}
 
+	//lets give more data than 
 
-	 fmt.Fprintf(conn, "read %v\r\n", name) // try a read now
+      // Let's try cas 
+   /* fmt.Fprintf(conn, "cas %v %v %v\r\n%v\r\n", "file2","1",len(contents), exptime, contents)           
+	scanner.Scan() // read first line
+	resp = scanner.Text() // extract the text from the buffer
+	arr = strings.Split(resp, " ") // split into OK and <version>
+	expect(t, arr[0], "OK")
+	version, err = strconv.ParseInt(arr[1], 10, 64) // parse version as number
+	if err != nil {
+		t.Error("Non-numeric version found")
+	}*/
+     
+      // lets give more data than mentioned
+    fmt.Fprintf(conn, "write %v %v %v\r\n%v\r\n", "file2", "3", exptime, "jadoo")           
+	scanner.Scan() // read first line
+	resp = scanner.Text() // extract the text from the buffer
+	arr = strings.Split(resp, " ") // split into OK and <version>
+	expect(t, arr[0], "OK")
+	version, err = strconv.ParseInt(arr[1], 10, 64) // parse version as number
+	if err != nil {
+		t.Error("Non-numeric version found")
+	}
+
+
+    
+   fmt.Fprintf(conn, "read %v\r\n", name) // try a read now
 	scanner.Scan()
 
 	arr = strings.Split(scanner.Text(), " ")
@@ -89,7 +113,7 @@ func TestTCPSimple(t *testing.T) {
     /// ------------- ----------Concurrency TESTCASES------------------------- //////////////////////////
    
     
-    for i:=0;i<5;i++{
+    for i:=0;i<1;i++{
     	go checkconcurrency(t)
     	time.Sleep(30*time.Second);
     }

@@ -313,7 +313,7 @@ func validate_command(token []string) bool {        // it checks whether a given
 func process_Msg(msg string, conn net.Conn) string {
 	var pre string
 	var flag int = 0
-	var flagC int = 0
+//	var flagC int = 0
 	var newline int = 0
 	var token []string
 	var further_token []string
@@ -378,7 +378,7 @@ func process_Msg(msg string, conn net.Conn) string {
 			}
 		} else if strings.Compare(further_token[0], "cas") == 0 {
 		//	fmt.Println("Heyyyy")
-			flagC = 1
+			flag = 1
 			pre = token[i] + "$$"
 			var further_token_content []string
 			filename = further_token[1]
@@ -389,7 +389,7 @@ func process_Msg(msg string, conn net.Conn) string {
 			} else {
 				exptime = ""
 			}
-			if casValid(filename, ver, conn) == false {              //pass all the content
+			if casValid(filename, ver, conn) == false {              
 				continue
 			}
 			var j int
@@ -408,12 +408,12 @@ func process_Msg(msg string, conn net.Conn) string {
 						pre = ""
 					}
 				} else {
-					flagC = 0
+					flag = 0
 					i = j - 1
 					break
 				}
 			} //for loop break
-			if flagC == 0 {
+			if flag == 0 {
 			//	write(filename, noof_byte, newline, exptime, content, conn)
 				pre = ""
 			} else {
