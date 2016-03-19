@@ -1,0 +1,936 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/abhisoniks/cs733/Assignment3/assign2.go (46.0%)</option>
+				
+				<option value="file1">github.com/abhisoniks/cs733/Assignment3/raft.go (98.2%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" >package main
+import (
+        "fmt"
+        //"github.com/cs733-iitb/log"
+)
+
+func (sm *STATEMACHINE) processEvent() <span class="cov8" title="1">{
+        for </span><span class="cov8" title="1">{
+                select </span>{
+                <span class="cov8" title="1">case appendMsg := &lt;-sm.SMchanels.clientCh:
+                        append1, _ := appendMsg.(APPEND) //convert it to Append
+                        sm.Append(append1)</span>
+                <span class="cov8" title="1">case peerMsg := &lt;-sm.SMchanels.netCh:
+                        switch peerMsg.(type) </span>{
+                        <span class="cov8" title="1">case APPENDENTRIESREQ: //if coming through channel is struct of type APPENDENTRIESREQ
+                                appendER, _ := peerMsg.(APPENDENTRIESREQ)
+                                sm.APPENDENTRIESREQ(appendER)</span>
+                        <span class="cov8" title="1">case VOTEREQ:
+                                voteRQ, _ := peerMsg.(VOTEREQ)
+                                sm.VOTEREQ(voteRQ)</span>
+                        <span class="cov8" title="1">case VOTERESP:
+                                vRes, _ := peerMsg.(VOTERESP)
+                                sm.VOTERESP(vRes)</span>
+                        <span class="cov8" title="1">case APPENDENTRIESRESP:
+                                ApRes, _ := peerMsg.(APPENDENTRIESRESP)
+                                sm.APPENDENTRIESRESP(ApRes)</span>
+                        }
+                //if coming through channel is struct of type APPENDENTRIESREQ        }
+                <span class="cov8" title="1">case &lt;-sm.SMchanels.timeoutCh:
+                                sm.Timeout()</span>
+                }
+        } // for loop end
+}
+
+
+func (sm *STATEMACHINE) Append(appendEVENT APPEND) <span class="cov8" title="1">{
+        switch sm.STATE </span>{
+        <span class="cov0" title="0">case "Follower":
+                c := COMMIT{DATA: string(appendEVENT.A), ERROR: 404}
+                sm.SMchanels.Action &lt;- c</span>
+        <span class="cov0" title="0">case "Candidate":
+                c := COMMIT{DATA: string(appendEVENT.A), ERROR: 404}
+                sm.SMchanels.Action &lt;- c</span>
+        <span class="cov8" title="1">case "Leader": //LOGSTORE ,SEND AppendENTRIESRPC ,reset ALARM
+                pINDEX, pTERM, _ := sm.getPrev()
+                newCommand := appendEVENT.A[:]
+                sm.LOG = append(sm.LOG, LOGENTRY{pINDEX + 1, pTERM, newCommand})
+                t:=LOGENTRY{pINDEX+1,pTERM,appendEVENT.A}
+                l := LOGSTORE{INDEX:pINDEX+1,DATA:t}
+                //COMMITINFO{DATA:t,index:pINDEX+1,Err:0}
+                sm.SMchanels.Action &lt;- l
+                apr := APPENDENTRIESREQ{TERM: sm.CURRENTTERM, LEADERID: sm.ID, PREVLOGINDEX: pINDEX, PREVLOGTERM: pTERM, ENTRIES: sm.LOG, LEADERCOMMIT: sm.COMMITINDEX}
+                fmt.Println("apr to send",apr)
+                sm.SMchanels.Action &lt;- SEND{ID_TOSEND: 500, EVENT: apr}
+                sm.SMchanels.Action &lt;- ALARM{TIME: 500}</span>
+                //        sm.SMchanels.Action &lt;- [3]string{"LOGSTORE(" + strconv.Itoa(pINDEX+1) + ")", "for each server p SEND(p,APPENDENTRIESREQ(" + strconv.Itoa(sm.CURRENTTERM) + "," + strconv.Itoa(0) + "," + strconv.Itoa(pINDEX) + "," + strconv.Itoa(pTERM) + "," + "log[" + strconv.Itoa(pINDEX) + ":]" + "," + strconv.Itoa(sm.COMMITINDEX) + ")", "ALARM(t)"}
+
+        }
+}
+
+func (sm *STATEMACHINE) APPENDENTRIESREQ(AER_EVENT APPENDENTRIESREQ) <span class="cov8" title="1">{
+        switch sm.STATE </span>{
+        <span class="cov8" title="1">case "Follower":
+                prevINDEX, _, _ := sm.getPrev()
+        if AER_EVENT.TERM &lt; sm.CURRENTTERM || AER_EVENT.PREVLOGINDEX &gt; prevINDEX </span><span class="cov0" title="0">{ // leader's TERM is less than CURRENTTERM
+                        sm.SMchanels.Action &lt;- SEND{ID_TOSEND: sm.LEADERID, EVENT: APPENDENTRIESRESP{TERM: sm.CURRENTTERM, SENDERID: sm.ID, AERESP: false}}
+                        t := sm.getElectionTime()
+                        sm.SMchanels.Action &lt;- ALARM{TIME: t}
+                        break</span>
+                }
+                <span class="cov8" title="1">if AER_EVENT.TERM &gt;= sm.CURRENTTERM &amp;&amp; AER_EVENT.ENTRIES == nil </span><span class="cov8" title="1">{ //check if its a heartbeat check previous TERM and INDEX
+                        if sm.LOG[AER_EVENT.PREVLOGINDEX].TERM == AER_EVENT.PREVLOGTERM </span><span class="cov8" title="1">{ //in both case reset Timeout
+                                sm.CURRENTTERM = AER_EVENT.TERM
+                                //        i := strconv.Itoa(sm.CURRENTTERM)
+                                //        sm.SMchanels.Action &lt;- [4]string{"true", i, strconv.Itoa(0), "ALARM(t)"}
+                                sm.LEADERID = AER_EVENT.LEADERID
+                                sm.SMchanels.Action &lt;- SEND{ID_TOSEND: sm.LEADERID, EVENT: APPENDENTRIESRESP{TERM: sm.CURRENTTERM, SENDERID: sm.ID, AERESP: true}}
+                                t := sm.getElectionTime()
+                                sm.SMchanels.Action &lt;- ALARM{TIME: t}
+                                sm.COMMITINDEX = AER_EVENT.LEADERCOMMIT //update your COMMITINDEX
+                        }</span><span class="cov0" title="0"> else {
+                                
+                                sm.SMchanels.Action &lt;- SEND{ID_TOSEND: sm.LEADERID, EVENT: APPENDENTRIESRESP{TERM: sm.CURRENTTERM, SENDERID: sm.ID, AERESP: false}}
+                                t := sm.getElectionTime()
+                                sm.SMchanels.Action &lt;- ALARM{TIME: t}
+
+                        }</span>
+                }<span class="cov8" title="1"> else { // this is not Heartbeat message.
+                   
+                        pINDEX := AER_EVENT.PREVLOGINDEX
+                        pTERM := sm.LOG[pINDEX].TERM
+                        pCommand := string(sm.LOG[pINDEX].COMMAND)
+                        if AER_EVENT.PREVLOGTERM != pTERM </span><span class="cov0" title="0">{
+                                sm.SMchanels.Action &lt;- SEND{ID_TOSEND: sm.LEADERID, EVENT: APPENDENTRIESRESP{TERM: sm.CURRENTTERM, SENDERID: sm.ID, AERESP: false}}
+                                t := sm.getElectionTime()
+                                sm.SMchanels.Action &lt;- ALARM{TIME: t}
+                        }</span><span class="cov8" title="1"> else if AER_EVENT.PREVLOGTERM == pTERM &amp;&amp; pCommand == string(AER_EVENT.ENTRIES[pINDEX].COMMAND) </span><span class="cov8" title="1">{ //all three matches
+                                var k int
+                                for k = pINDEX + 1; k &lt; len(AER_EVENT.ENTRIES); k++ </span><span class="cov8" title="1">{ // whereever matches copy whole log of leader and set CURRENTTERM equal to leader's TERM
+                                        sm.LOG = append(sm.LOG, AER_EVENT.ENTRIES[k])
+                                        sm.SMchanels.Action &lt;- LOGSTORE{k,AER_EVENT.ENTRIES[k]}
+                                }</span>
+                                //t:=AER_EVENT.ENTRIES[k]
+                                //COMMITINFO{DATA:t,index:k,Err:0}
+                                
+                                <span class="cov8" title="1">sm.COMMITINDEX = AER_EVENT.LEADERCOMMIT
+                                sm.CURRENTTERM = AER_EVENT.TERM
+                                sm.VOTEDFOR = 6 // for this TERM votedFor is null
+                                sm.LEADERID = AER_EVENT.LEADERID
+                                sm.SMchanels.Action &lt;- SEND{ID_TOSEND: sm.LEADERID, EVENT: APPENDENTRIESRESP{TERM: sm.CURRENTTERM, SENDERID: sm.ID, AERESP: true}}
+                                ti := sm.getElectionTime()
+                                sm.SMchanels.Action &lt;- ALARM{TIME: ti}</span>
+                        }<span class="cov0" title="0"> else if AER_EVENT.PREVLOGTERM == pTERM &amp;&amp; pCommand != string(AER_EVENT.ENTRIES[pINDEX].COMMAND) </span><span class="cov0" title="0">{ //command does not matches
+        
+                                sm.SMchanels.Action &lt;- SEND{ID_TOSEND: sm.LEADERID, EVENT: APPENDENTRIESRESP{TERM: sm.CURRENTTERM, SENDERID: sm.ID, AERESP: false}}
+                                t := sm.getElectionTime()
+                                sm.SMchanels.Action &lt;- ALARM{TIME: t}
+                        }</span>
+                }
+        <span class="cov0" title="0">case "Leader": //
+                if AER_EVENT.TERM &lt; sm.CURRENTTERM </span><span class="cov0" title="0">{ // leader's TERM is more than CURRENTTERM
+                        sm.SMchanels.Action &lt;- SEND{ID_TOSEND: sm.LEADERID, EVENT: APPENDENTRIESRESP{TERM: sm.CURRENTTERM, SENDERID: sm.ID, AERESP: false}}
+                        sm.SMchanels.Action &lt;- ALARM{TIME: 500}
+                        break</span>
+                }<span class="cov0" title="0"> else {
+                        sm.STATE = "Follower"
+                        ////fmt.Println("New state is ", sm.STATE, " ", sm)
+                        sm.VOTEGRANTED = [2]int{0, 0}
+                        sm.VOTEDFOR = 6
+                        sm.SMchanels.Action &lt;- SEND{ID_TOSEND: sm.LEADERID, EVENT: APPENDENTRIESRESP{TERM: sm.CURRENTTERM, SENDERID: sm.ID, AERESP: false}}
+                        t := sm.getElectionTime()
+                        sm.SMchanels.Action &lt;- ALARM{TIME: t}
+                }</span>
+
+        <span class="cov0" title="0">case "Candidate":
+                prevINDEX, _, _ := sm.getPrev()
+                if AER_EVENT.TERM &lt; sm.CURRENTTERM </span><span class="cov0" title="0">{ // leader's TERM is less than CURRENTTERM
+                        sm.SMchanels.Action &lt;- SEND{ID_TOSEND: sm.LEADERID, EVENT: APPENDENTRIESRESP{TERM: sm.CURRENTTERM, SENDERID: sm.ID, AERESP: false}}
+                        t := sm.getElectionTime()
+                        sm.SMchanels.Action &lt;- ALARM{TIME: t}
+                        return
+                }</span>
+                <span class="cov0" title="0">pINDEX := AER_EVENT.PREVLOGINDEX
+                var pTERM int
+                if len(sm.LOG) &gt; 0 </span><span class="cov0" title="0">{ //initial setUp
+                        pTERM = sm.LOG[pINDEX].TERM
+                }</span><span class="cov0" title="0"> else {
+                        pTERM = 0
+                }</span>
+                //_ = sm.LOG[pINDEX].command
+                <span class="cov0" title="0">if AER_EVENT.TERM &gt;= sm.CURRENTTERM &amp;&amp; AER_EVENT.ENTRIES == nil </span><span class="cov0" title="0">{ //check if its a heartbeat check previous TERM and INDEX
+                        if pTERM &gt;= AER_EVENT.PREVLOGTERM &amp;&amp; AER_EVENT.PREVLOGINDEX &gt;= prevINDEX </span><span class="cov0" title="0">{
+                                sm.COMMITINDEX = AER_EVENT.LEADERCOMMIT //update your COMMITINDEX
+                                sm.STATE = "Follower"
+                                sm.CURRENTTERM = AER_EVENT.TERM
+                                sm.VOTEGRANTED = [2]int{0, 0}
+                                sm.VOTEDFOR = 6
+                                sm.LEADERID = AER_EVENT.LEADERID
+                                //        i := strconv.Itoa(sm.CURRENTTERM)
+                                //sm.SMchanels.Action &lt;- [4]string{"true", i, strconv.Itoa(0), "ALARM(t)"}
+                                sm.SMchanels.Action &lt;- SEND{ID_TOSEND: sm.LEADERID, EVENT: APPENDENTRIESRESP{TERM: sm.CURRENTTERM, SENDERID: sm.ID, AERESP: true}}
+                                t := sm.getElectionTime()
+                                sm.SMchanels.Action &lt;- ALARM{TIME: t}
+                        }</span><span class="cov0" title="0"> else {
+                                
+                                sm.SMchanels.Action &lt;- SEND{ID_TOSEND: sm.LEADERID, EVENT: APPENDENTRIESRESP{TERM: sm.CURRENTTERM, SENDERID: sm.ID, AERESP: false}}
+                                t := sm.getElectionTime()
+                                sm.SMchanels.Action &lt;- ALARM{TIME: t}
+                        }</span>
+                }<span class="cov0" title="0"> else { // this is not Heartbeat message.
+                        pINDEX := AER_EVENT.PREVLOGINDEX
+                        pTERM := sm.LOG[pINDEX].TERM
+                        pCommand := string(sm.LOG[pINDEX].COMMAND)
+
+                        if AER_EVENT.PREVLOGTERM != pTERM </span><span class="cov0" title="0">{
+                                sm.SMchanels.Action &lt;- SEND{ID_TOSEND: sm.LEADERID, EVENT: APPENDENTRIESRESP{TERM: sm.CURRENTTERM, SENDERID: sm.ID, AERESP: false}}
+                                t := sm.getElectionTime()
+                                sm.SMchanels.Action &lt;- ALARM{TIME: t}
+                        }</span><span class="cov0" title="0"> else if AER_EVENT.PREVLOGTERM == pTERM &amp;&amp; pCommand == string(AER_EVENT.ENTRIES[pINDEX].COMMAND) </span><span class="cov0" title="0">{ //all three matches
+                                //var k int
+                                for k := pINDEX + 1; k &lt; len(AER_EVENT.ENTRIES); k++ </span><span class="cov0" title="0">{ // whereever matches copy whole log of leader and set CURRENTTERM equal to leader's TERM
+                                        sm.LOG = append(sm.LOG, AER_EVENT.ENTRIES[k])
+                                        fmt.Println("LOGSTORE++")
+                                        sm.SMchanels.Action &lt;- LOGSTORE{k,AER_EVENT.ENTRIES[k]}
+                                }</span>
+                                //t:=AER_EVENT.ENTRIES[k]
+                                //COMMITINFO{DATA:t,index:k,Err:0}
+                                <span class="cov0" title="0">sm.STATE = "Follower"
+                                sm.COMMITINDEX = AER_EVENT.LEADERCOMMIT
+                                sm.CURRENTTERM = AER_EVENT.TERM
+                                sm.VOTEDFOR = 6 // for this TERM votedFor is null
+                                sm.LEADERID = AER_EVENT.LEADERID
+                                sm.SMchanels.Action &lt;- SEND{ID_TOSEND: sm.LEADERID, EVENT: APPENDENTRIESRESP{TERM: sm.CURRENTTERM, SENDERID: sm.ID, AERESP: true}}
+                                ti := sm.getElectionTime()
+                                sm.SMchanels.Action &lt;- ALARM{TIME: ti}</span>
+
+                        }<span class="cov0" title="0"> else if AER_EVENT.PREVLOGTERM == pTERM &amp;&amp; pCommand != string(AER_EVENT.ENTRIES[pINDEX].COMMAND) </span><span class="cov0" title="0">{
+                                aers := APPENDENTRIESRESP{TERM: sm.CURRENTTERM, SENDERID: sm.ID, AERESP: false}
+                                sm.SMchanels.Action &lt;- SEND{ID_TOSEND: sm.LEADERID, EVENT: aers}
+
+                        }</span>
+                }
+        }
+}
+
+func (sm *STATEMACHINE) Timeout() <span class="cov8" title="1">{
+    //        fmt.Println("TIMEOUT")
+        switch sm.STATE </span>{
+        <span class="cov8" title="1">case "Follower": //change state increase TERM by 1 and start election and set election timer
+                sm.CURRENTTERM = sm.CURRENTTERM + 1
+                pINDEX, pTERM, _ := sm.getPrev()
+                sm.STATE = "Candidate"
+                sm.VOTEDFOR = sm.ID // vote to itself
+                sm.VOTEGRANTED[0] = 1
+                VR := VOTEREQ{TERM: sm.CURRENTTERM, CANDIDATEID: sm.ID, LASTLOGINDEX: pINDEX, LASTLOGTERM: pTERM}
+                sm.SMchanels.Action &lt;- SEND{ID_TOSEND: 500, EVENT: VR}
+                t := sm.getElectionTime()
+                sm.SMchanels.Action &lt;- ALARM{TIME: t}</span>
+        //        sm.SMchanels.Action &lt;- [2]string{"for all peer p SEND(p,VOTEREQ(" + strconv.Itoa(sm.CURRENTTERM) + "," + strconv.Itoa(0) + "," + strconv.Itoa(pINDEX) + "," + strconv.Itoa(pTERM) + "))", "ALARM(t)"}
+        <span class="cov8" title="1">case "Leader": // SEND heart beat message and reset timer
+                pINDEX, pTERM, _ := sm.getPrev()
+                //fmt.Println("2")
+                aer := APPENDENTRIESREQ{TERM: sm.CURRENTTERM, LEADERID: sm.ID, PREVLOGINDEX: pINDEX, PREVLOGTERM: pTERM, ENTRIES: nil, LEADERCOMMIT: sm.COMMITINDEX}
+                sm.SMchanels.Action &lt;- SEND{ID_TOSEND: 500, EVENT: aer}
+                sm.SMchanels.Action &lt;- ALARM{TIME: 500}</span>
+        //sm.SMchanels.Action &lt;- [2]string{"for all peer p SEND(p,APPEE=E," ",sm)
+        <span class="cov0" title="0">case "Candidate":
+                sm.STATE = "Candidate"
+                sm.CURRENTTERM = sm.CURRENTTERM + 1
+                sm.VOTEDFOR = sm.ID // vote to itself first
+                sm.VOTEGRANTED[0] = 1
+                //fmt.Println("New state is ", sm.STATE, " ", sm)
+
+                pINDEX, pTERM, _ := sm.getPrev()
+            //        fmt.Println("VoteRequest send",sm)
+                VR := VOTEREQ{TERM: sm.CURRENTTERM, CANDIDATEID: sm.ID, LASTLOGINDEX: pINDEX, LASTLOGTERM: pTERM}
+
+                sm.SMchanels.Action &lt;- SEND{ID_TOSEND: 500, EVENT: VR}
+                t := sm.getElectionTime()
+
+                sm.SMchanels.Action &lt;- ALARM{TIME: t}</span>
+                //                sm.SMchanels.Action &lt;- [2]string{"for all peer p SEND(p,VOTEREQ(" + strconv.Itoa(sm.CURRENTTERM) + "," + strconv.Itoa(0) + "," + strconv.Itoa(pINDEX) + "," + strconv.Itoa(pTERM) + "))", "ALARM(t)"}
+        }
+}
+
+func (sm *STATEMACHINE) APPENDENTRIESRESP(AER_EVENT APPENDENTRIESRESP) <span class="cov8" title="1">{
+        //fmt.Println("AppendEntriesResponse RECEIVED ", sm, " ", "response is", AER_EVENT)
+        switch sm.STATE </span>{
+        <span class="cov0" title="0">case "Follower": break</span>//ignore it
+        <span class="cov0" title="0">case "Candidate": break</span>//ignore it
+        <span class="cov8" title="1">case "Leader":
+                if AER_EVENT.AERESP == true </span><span class="cov8" title="1">{
+                        //fmt.Println("true")
+                        if len(sm.LOG) &gt; 0 </span><span class="cov8" title="1">{ // when leader has log .
+                                lastINDEX := sm.LOG[len(sm.LOG)-1].INDEX
+                                sm.NEXTINDEX[AER_EVENT.SENDERID] = lastINDEX + 1
+                                sm.MATCHINDEX[AER_EVENT.SENDERID] = lastINDEX
+                        }</span><span class="cov0" title="0"> else { //leader has no log New set up
+                                lastINDEX := 0
+                                sm.NEXTINDEX[AER_EVENT.SENDERID] = lastINDEX
+                                sm.MATCHINDEX[AER_EVENT.SENDERID] = lastINDEX
+
+                        }</span>
+                }<span class="cov0" title="0"> else {
+                        //fmt.Println("false")
+                        sm.NEXTINDEX[AER_EVENT.SENDERID] -= 1
+                        var newpINDEX, newpTERM int
+                        newpINDEX = 0
+                        newpTERM = 0
+
+                        if len(sm.LOG) &gt; 0 </span><span class="cov0" title="0">{
+                                newpINDEX = sm.LOG[sm.NEXTINDEX[AER_EVENT.SENDERID]].INDEX //calculate new previous INDEX to SEND with AppenENTRIESRPC
+                                newpTERM = sm.LOG[sm.NEXTINDEX[AER_EVENT.SENDERID]].TERM   //calculate new previous TERM to SEND with AppenENTRIESRPC
+                        //        fmt.Println("AEREQST SEND")
+                                aer := APPENDENTRIESREQ{TERM: sm.CURRENTTERM, LEADERID: sm.ID, PREVLOGINDEX: newpINDEX, PREVLOGTERM: newpTERM, ENTRIES: sm.LOG[(sm.NEXTINDEX[AER_EVENT.SENDERID]):], LEADERCOMMIT: sm.COMMITINDEX}
+                                sm.SMchanels.Action &lt;- SEND{ID_TOSEND: AER_EVENT.SENDERID, EVENT: aer}
+                        }</span><span class="cov0" title="0"> else {
+                                newpINDEX = 0
+                                newpTERM = 0
+                        
+                                aer := APPENDENTRIESREQ{TERM: sm.CURRENTTERM, LEADERID: sm.ID, PREVLOGINDEX: newpINDEX, PREVLOGTERM: newpTERM, ENTRIES: nil, LEADERCOMMIT: sm.COMMITINDEX}
+                                sm.SMchanels.Action &lt;- SEND{ID_TOSEND: AER_EVENT.SENDERID, EVENT: aer}
+                        }</span>
+                        <span class="cov0" title="0">sm.SMchanels.Action &lt;- ALARM{TIME: 500}</span>
+
+                        //sm.SMchanels.Action &lt;- [2]string{"SEND(" + strconv.Itoa(AER_EVENT.SENDERID) + ",APPENDENTRIESREQ(" + strconv.Itoa(sm.CURRENTTERM) + "," + strconv.Itoa(0) + "," + strconv.Itoa(newpINDEX) + "," + strconv.Itoa(newpTERM) + "," + "log[" + strconv.Itoa(sm.NEXTINDEX[AER_EVENT.SENDERID]-1) + ":]" + "," + strconv.Itoa(sm.COMMITINDEX) + ")", "ALARM(t)"}
+                }
+
+                <span class="cov8" title="1">count := make(map[int]int)
+                for i := 0; i &lt; 5; i++ </span><span class="cov8" title="1">{
+                        var sum int = 0
+                        if sm.MATCHINDEX[i] &gt; sm.COMMITINDEX </span><span class="cov8" title="1">{
+                                for j := 0; j &lt; 5; j++ </span><span class="cov8" title="1">{
+                                        if sm.MATCHINDEX[j] == sm.MATCHINDEX[i] </span><span class="cov8" title="1">{
+                                                sum = sum + 1
+                                        }</span>
+                                }
+                                <span class="cov8" title="1">count[sm.MATCHINDEX[i]] = sum</span>
+                        }<span class="cov8" title="1"> else {
+                                count[sm.MATCHINDEX[i]] = 0
+                        }</span>
+                }
+                <span class="cov8" title="1">temp := sm.COMMITINDEX
+                for key, value := range count </span><span class="cov8" title="1">{
+                        if key &gt; temp &amp;&amp; value &gt;= 3 </span><span class="cov8" title="1">{
+                                temp = key
+                        }</span>
+                }
+                <span class="cov8" title="1">if temp != sm.COMMITINDEX </span><span class="cov8" title="1">{ //COMMITINDEX is changed
+                        sm.COMMITINDEX = temp
+                        sm.SMchanels.Action &lt;- COMMIT{INDEX: sm.COMMITINDEX, DATA: string(sm.LOG[len(sm.LOG)-1].COMMAND)}
+                }</span>
+        }
+}
+
+func (sm *STATEMACHINE) VOTEREQ(VRQ_EVENT VOTEREQ) <span class="cov8" title="1">{
+        //fmt.Println("VOTEREQ")
+        pINDEX, _, _ := sm.getPrev() //will return previouscommand,previousId and previousTERM
+        //fmt.Println("VoteReq came ", sm, " ", "sender", "=", VRQ_EVENT)
+        switch sm.STATE </span>{
+        <span class="cov8" title="1">case "Follower":
+                if (sm.VOTEDFOR == 6) &amp;&amp; VRQ_EVENT.TERM &gt;= sm.CURRENTTERM   </span><span class="cov8" title="1">{
+                        if VRQ_EVENT.LASTLOGINDEX &gt;= pINDEX </span><span class="cov8" title="1">{
+                                //        sm.SMchanels.Action &lt;- "SEND(" + cID + ",VOTERESP(" + cT + ",VOTEGRANTED=yes))"
+                                V_res := VOTERESP{TERM: sm.CURRENTTERM, VOTERESP: true}
+                                sm.SMchanels.Action &lt;- SEND{ID_TOSEND: VRQ_EVENT.CANDIDATEID, EVENT: V_res}
+                                sm.VOTEDFOR = VRQ_EVENT.CANDIDATEID
+                        //        fmt.Println("response send=", V_res)
+                        }</span><span class="cov0" title="0"> else {
+                                //sm.SMchanels.Action &lt;- "SEND(" + cID + ",VOTERESP(" + cT + ",VOTEGRANTED=No))"
+                                V_res := VOTERESP{sm.CURRENTTERM, false}
+                                sm.SMchanels.Action &lt;- SEND{VRQ_EVENT.CANDIDATEID, V_res}
+                        //        fmt.Println("response send=", V_res)
+                        }</span>
+                }<span class="cov0" title="0"> else {
+                        //sm.SMchanels.Action &lt;- "SEND(" + cID + ",VOTERESP(" + cT + ",VOTEGRANTED=No))"
+                        V_res := VOTERESP{sm.CURRENTTERM, false}
+                        sm.SMchanels.Action &lt;- SEND{VRQ_EVENT.CANDIDATEID, V_res}
+
+                }</span>
+
+        <span class="cov0" title="0">case "Leader":
+                if VRQ_EVENT.TERM &gt;= sm.CURRENTTERM </span><span class="cov0" title="0">{
+                        sm.STATE = "Follower" // some of initialization before going in Follower state
+                                                //fmt.Println("New state is ", sm.STATE, " ", sm)
+
+                        sm.VOTEDFOR = 6
+                        sm.VOTEGRANTED = [2]int{0, 0}
+                        V_res := VOTERESP{sm.CURRENTTERM, false}
+                        sm.SMchanels.Action &lt;- SEND{VRQ_EVENT.CANDIDATEID, V_res}
+                //        fmt.Println("response send=", V_res)
+                }</span><span class="cov0" title="0"> else {
+                        //sm.SMchanels.Action &lt;- "SEND(" + cID + ",VOTERESP(" + cT + ",VOTEGRANTED=No))"
+                        V_res := VOTERESP{sm.CURRENTTERM, false}
+                        sm.SMchanels.Action &lt;- SEND{VRQ_EVENT.CANDIDATEID, V_res}
+                //        fmt.Println("response send=", V_res)
+                }</span>
+
+        <span class="cov0" title="0">case "Candidate":
+                if VRQ_EVENT.TERM &gt; sm.CURRENTTERM </span><span class="cov0" title="0">{ //if voteFrom higher TERM
+                        sm.STATE = "Follower"
+                        //fmt.Println("New state is ", sm.STATE, " ", sm)
+                        sm.VOTEGRANTED = [2]int{0, 0}
+                        sm.VOTEDFOR = 6 //VRQ_EVENT.CANDIDATEID
+                        sm.CURRENTTERM = VRQ_EVENT.TERM
+                        V_res := VOTERESP{sm.CURRENTTERM, false}
+                        sm.SMchanels.Action &lt;- SEND{VRQ_EVENT.CANDIDATEID, V_res}
+                        t := sm.getElectionTime()
+                        sm.SMchanels.Action &lt;- ALARM{TIME: t}
+                //        fmt.Println("response send=", V_res)
+                }</span><span class="cov0" title="0"> else {
+                        V_res := VOTERESP{sm.CURRENTTERM, false}
+                        sm.SMchanels.Action &lt;- SEND{VRQ_EVENT.CANDIDATEID, V_res}
+                //        fmt.Println("response send=", V_res)
+                }</span>
+        }
+}
+
+func (sm *STATEMACHINE) VOTERESP(VRS_EVENT VOTERESP) <span class="cov8" title="1">{
+        //fmt.Println("---&gt; Vote Me")
+
+        switch sm.STATE </span>{
+        <span class="cov0" title="0">case "Follower": break</span>
+        <span class="cov8" title="1">case "Leader":  // fmt.Println("old voteRes");
+        break</span>
+        <span class="cov8" title="1">case "Candidate":
+
+                if VRS_EVENT.TERM &gt; sm.CURRENTTERM </span><span class="cov0" title="0">{ // If TERM is greater than sm.TERM go to Follower state &amp; reInitialize its timer
+                        sm.STATE = "Follower"
+                        sm.VOTEDFOR = 6 // 6 means for this TERM it has not give vote to anyone
+                        sm.CURRENTTERM = VRS_EVENT.TERM
+                        //sm.SMchanels.Action &lt;- "ALARM(t)"
+                        t := sm.getElectionTime()
+                        sm.SMchanels.Action &lt;- ALARM{TIME: t}
+                        return
+                }</span>
+                <span class="cov8" title="1">if VRS_EVENT.TERM &lt;= sm.CURRENTTERM &amp;&amp; VRS_EVENT.VOTERESP == true </span><span class="cov8" title="1">{
+                        sm.VOTEGRANTED[0] += 1
+                }</span>
+                <span class="cov8" title="1">if VRS_EVENT.TERM &lt;= sm.CURRENTTERM &amp;&amp; VRS_EVENT.VOTERESP == false </span><span class="cov0" title="0">{
+                        sm.VOTEGRANTED[1] += 1
+                }</span>
+                <span class="cov8" title="1">if sm.VOTEGRANTED[0] &gt;= 3 </span><span class="cov8" title="1">{ // become Leader
+                        pINDEX, pTERM, _ := sm.getPrev()
+                        sm.VOTEGRANTED = [2]int{0, 0} //reintialize VOTEGRANTED
+                        sm.VOTEDFOR = 6               //reintialize voteFor
+                        sm.STATE = "Leader"
+                        sm.LEADERID = sm.ID
+                        sm.LEADERID = 0
+                        
+                        aer := APPENDENTRIESREQ{sm.CURRENTTERM, sm.LEADERID, pINDEX, pTERM, nil, sm.COMMITINDEX}
+                //        fmt.Println("send AppendEntries Request by",sm.ID," ",aer,)
+                        sm.SMchanels.Action &lt;- SEND{0, aer}
+                        sm.SMchanels.Action &lt;- ALARM{TIME: 500}
+                }</span>
+                <span class="cov8" title="1">if sm.VOTEGRANTED[1] &gt;= 3 </span><span class="cov0" title="0">{ //become Follower here
+                        sm.VOTEGRANTED = [2]int{0, 0} //reintialize VOTEGRANTED
+                        sm.VOTEDFOR = 6               //reintialize voteFor
+                        sm.STATE = "Follower"
+                        //fmt.Println("New state is ", sm.STATE, " ", sm)
+                        //sm.SMchanels.Action &lt;- "ALARM(t)"
+                        t := sm.getElectionTime()
+                        sm.SMchanels.Action &lt;- ALARM{TIME: t}
+
+                }</span>
+                <span class="cov8" title="1">if sm.VOTEGRANTED[1] == 2 &amp;&amp; sm.VOTEGRANTED[0] == 2 </span><span class="cov0" title="0">{ //voteSplit  &amp;&amp; Re-electionn
+                        pINDEX, pTERM, _ := sm.getPrev()
+                        sm.CURRENTTERM = sm.CURRENTTERM + 1
+                        sm.VOTEDFOR = 0 // vote to itself.sm own id is 0
+                        sm.VOTEGRANTED = [2]int{0, 0}
+                        //sm.SMchanels.Action &lt;- [2]string{"for all peer p SEND(p,VOTEREQ(" + strconv.Itoa(sm.CURRENTTERM) + "," + strconv.Itoa(0) + "," + strconv.Itoa(pINDEX) + "," + strconv.Itoa(pTERM) + "))", "ALARM(t)"}
+                        vr := VOTEREQ{sm.CURRENTTERM, sm.ID, pINDEX, pTERM}
+                        sm.SMchanels.Action &lt;- SEND{0, vr}
+                        t := sm.getElectionTime()
+                        sm.SMchanels.Action &lt;- ALARM{TIME: t}
+                }</span>
+        }
+}
+
+func (sm *STATEMACHINE) getPrev() (int, int, string) <span class="cov8" title="1">{ //this function returns previous log INDEX log TERM and previous command
+        var prevI int
+        var prevT int
+        var prevC string
+        for i := 0; i &lt; len(sm.LOG); i++ </span><span class="cov8" title="1">{
+                prevI = sm.LOG[i].INDEX
+                prevT = sm.LOG[i].TERM
+                prevC = string(sm.LOG[i].COMMAND)
+        }</span>
+        <span class="cov8" title="1">return prevI, prevT, prevC</span>
+}
+
+func (sm *STATEMACHINE) getElectionTime() int <span class="cov8" title="1">{
+        switch sm.ID </span>{
+        <span class="cov8" title="1">case 0:
+                return 2200</span>
+        <span class="cov8" title="1">case 1:
+                return 2700</span>
+        <span class="cov8" title="1">case 2:
+                return 3200</span>
+        <span class="cov8" title="1">case 3:
+                return 3700</span>
+        <span class="cov8" title="1">case 4:
+                return 4200</span>
+        }
+        <span class="cov0" title="0">return 0</span>
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package main
+import (
+        "time"
+        "github.com/cs733-iitb/cluster"
+        "github.com/cs733-iitb/log"
+        "encoding/gob"
+        "strings"
+        "fmt"
+//        "reflect"
+
+        )
+
+var log0,log1,log2,log3,log4 *log.Log     //These are log variable name for each node
+
+
+func (rn *RaftNode) Append(data string) <span class="cov8" title="1">{    //This functioin handles every Append request coming to this node
+        rn.sm.SMchanels.clientCh &lt;- APPEND{[]byte(data)}      //It passes this Append request to stateMAchine through clientCh channel
+}</span>
+
+func (rn *RaftNode) CommittedIndex() int<span class="cov8" title="1">{     //This function returns commited Index 
+        return rn.sm.COMMITINDEX;
+}</span>
+
+func checkError(e error) <span class="cov8" title="1">{
+        if e != nil </span><span class="cov0" title="0">{
+                fmt.Println(e)
+        }</span>
+}
+
+// makerafts function will make 5 rodeNodes .It will associate a stateMAchine to all nodes.
+func makerafts() []*RaftNode <span class="cov8" title="1">{
+        gob.Register(VOTERESP{})                 // register a struct name by giving it a dummy object of that name.
+        gob.Register(VOTEREQ{})
+        gob.Register(APPENDENTRIESREQ{})
+        gob.Register(APPENDENTRIESRESP{})
+        gob.Register(LOGENTRY{})
+        gob.Register(COMMIT{})
+        gob.Register(SEND{})
+        
+        raft0, err := cluster.New(0, "peer.json")
+        checkError(err)
+        raft1, err := cluster.New(1, "peer.json")
+        checkError(err)
+        raft2, err := cluster.New(2, "peer.json")
+        checkError(err)
+        raft3, err := cluster.New(3, "peer.json")
+        checkError(err)
+        raft4, err := cluster.New(4, "peer.json")
+        checkError(err)
+        node0:=initialize(raft0,0)
+        node1:=initialize(raft1,1)
+        node2:=initialize(raft2,2)
+        node3:=initialize(raft3,3)
+        node4:=initialize(raft4,4)
+        raftSet:= []*RaftNode{node0,node1,node2,node3,node4}
+        return raftSet
+}</span>
+
+//Initialize function initialize all RaftNode related structure and also Initialize RaftNode.It will initialize STATEMACHINE
+//This function starts stateMachine, timer of Node ,a routine of checking Inbox and a routine for checking Action coming from stateMAchine
+
+func initialize(serv cluster.Server, id int) *RaftNode<span class="cov8" title="1">{
+        var err error;
+        switch id </span>{
+                //THis will initialize RaftNode with ID 0
+        <span class="cov8" title="1">case 0:
+                ch0 := new(Channel)                                    //Make channels between SM and node
+                ch0.Action = make(chan interface{},40)
+                ch0.clientCh=make(chan interface{},40)
+                ch0.timeoutCh=make(chan interface{},40)
+                ch0.netCh=make(chan interface{},40)
+
+                raft_config := &amp;Config{0,"log0",2200,500}             //Initialize config of node
+                temp_sm0 := &amp;STATEMACHINE{ID: 0, VOTEDFOR: 6, STATE: "Follower",SMchanels:ch0,NEXTINDEX:[5]int{2,2,2,2,2}}                  ///Initialize stateMAchine
+                
+                // Enter a sample data in log and write on disk
+                temp_sm0.LOG = make([]LOGENTRY,2)
+                temp_sm0.LOG[0]=LOGENTRY{0,0,[]byte("foo")}
+                temp_sm0.LOG[1]=LOGENTRY{1,0,[]byte("bar")}
+
+                raftN0 := &amp;RaftNode{config:raft_config,timerFlag:1,sm:temp_sm0}    //FInally Make Node
+                raftN0.CommitChannel = make(chan interface{},40)
+
+                log0, err = log.Open("log0")        //Open Log file related to this stateMachine
+                checkError(err)
+                log0.RegisterSampleEntry(LOGENTRY{}) 
+                
+                log0.Append(temp_sm0.LOG[0])    //Put some sample data in Log of this Node
+                log0.Append(temp_sm0.LOG[1])
+                
+                go raftN0.check_Inbox(serv)    // this routine is checking for other peer Message at Inbox
+                go raftN0.check_SMAction(serv) // this routine is getting actionn from State Machine through Action channel
+        go temp_sm0.processEvent()     //start stateMachine
+        
+                //start Timer for this Node        
+                now:= time.Now()        
+                raftN0.Exp_Time = now.Add(time.Duration(raft_config.ElectionTimeout) * time.Millisecond)
+                go raftN0.timer2()
+                return raftN0</span>;
+        <span class="cov8" title="1">case 1:
+                ch1 := new(Channel)
+                ch1.Action = make(chan interface{},40)
+                ch1.clientCh=make(chan interface{},40)
+                ch1.timeoutCh=make(chan interface{},40)
+                ch1.netCh=make(chan interface{},40)
+            
+                raft_config := &amp;Config{Id: 1, LogDir: "log1", ElectionTimeout: 2700, HeartbeatTimeout: 500}
+                temp_sm1 := new(STATEMACHINE)
+                temp_sm1 = &amp;STATEMACHINE{ID: 1, VOTEDFOR: 6, STATE: "Follower",SMchanels:ch1,NEXTINDEX:[5]int{2,2,2,2,2}}
+
+                //Put some Entry in Log 
+                temp_sm1.LOG = make([]LOGENTRY,2)
+                temp_sm1.LOG[0]=LOGENTRY{0,0,[]byte("foo")}
+                temp_sm1.LOG[1]=LOGENTRY{1,0,[]byte("bar")}
+                
+        //Intialize RaftNode
+                raftN1 := new(RaftNode)
+                raftN1 = &amp;RaftNode{config:raft_config,timerFlag:1,sm:temp_sm1}    //FInally Make Node
+                raftN1.CommitChannel = make(chan interface{},40)
+                log1, err= log.Open("log1")        //Open Log file
+                checkError(err)
+                log1.RegisterSampleEntry(LOGENTRY{})
+                
+                //Append data In file
+                log1.Append(temp_sm1.LOG[0])
+                log1.Append(temp_sm1.LOG[1])
+                go raftN1.check_Inbox(serv) // this routine is checking for other peer Message at Inbox
+                go raftN1.check_SMAction(serv) // this routine is getting actionn from State Machine through Action channel
+                
+                //Following routine handles timer for this raftNode
+                now:= time.Now()        
+                raftN1.Exp_Time = now.Add(time.Duration(raft_config.ElectionTimeout) * time.Millisecond)
+            go raftN1.timer2()
+                go temp_sm1.processEvent() //start stateMachine
+                
+                return raftN1</span>;
+        <span class="cov8" title="1">case 2:
+                //This will intialize RaftNode with ID 2
+                ch2 := new(Channel)
+                ch2.Action = make(chan interface{},40)
+                ch2.clientCh=make(chan interface{},40)
+                ch2.timeoutCh=make(chan interface{},40)
+                ch2.netCh=make(chan interface{},40)
+                raft_config := &amp;Config{Id: 2, LogDir: "log2", ElectionTimeout: 3200, HeartbeatTimeout: 500}
+                temp_sm2 := new(STATEMACHINE)
+                temp_sm2 = &amp;STATEMACHINE{ID: 2, VOTEDFOR: 6, STATE: "Follower",SMchanels:ch2,NEXTINDEX:[5]int{2,2,2,2,2}}
+
+                temp_sm2.LOG = make([]LOGENTRY,2)
+                temp_sm2.LOG[0]=LOGENTRY{0,0,[]byte("foo")}
+                temp_sm2.LOG[1]=LOGENTRY{1,0,[]byte("bar")}
+                //temp_sm2.LOG=append(temp_sm2.LOG,LOGENTRY{0,0,[]byte("foo")})             // Entry in Log
+
+                raftN2 := &amp;RaftNode{config:raft_config,timerFlag:1,sm:temp_sm2}    //FInally Make Node
+                raftN2.CommitChannel = make(chan interface{},40)
+                log2,err = log.Open("log2")        //Open Log file
+                log2.RegisterSampleEntry(LOGENTRY{})
+                checkError(err)
+                log2.Append(temp_sm2.LOG[0])
+                log2.Append(temp_sm2.LOG[1])
+                
+                go raftN2.check_Inbox(serv) // this routine is checking for other peer Message at Inbox
+                go raftN2.check_SMAction(serv) // this routine is getting actionn from State Machine through Action channel
+                go temp_sm2.processEvent() //start stateMachine
+                now:= time.Now()        
+                raftN2.Exp_Time = now.Add(time.Duration(raft_config.ElectionTimeout) * time.Millisecond)
+                raftN2.CommitChannel = make(chan interface{},40)
+                go raftN2.timer2()
+                return raftN2</span>;
+                
+
+        <span class="cov8" title="1">case 3:
+                // This will Intiliaze RaftNode with id   3
+                ch3 := new(Channel)
+                ch3.Action = make(chan interface{},40)
+                ch3.clientCh=make(chan interface{},40)
+                ch3.timeoutCh=make(chan interface{},40)
+                ch3.netCh=make(chan interface{},40)
+            //        raft_config := new(Config)
+                raft_config := &amp;Config{Id: 3, LogDir: "log3", ElectionTimeout: 3700, HeartbeatTimeout: 500}
+                temp_sm3 := new(STATEMACHINE)
+                temp_sm3 = &amp;STATEMACHINE{ID: 3, VOTEDFOR: 6, STATE: "Follower",SMchanels:ch3,NEXTINDEX:[5]int{2,2,2,2,2}}
+
+                temp_sm3.LOG = make([]LOGENTRY,2)
+
+                temp_sm3.LOG[0]=LOGENTRY{0,0,[]byte("foo")}
+                temp_sm3.LOG[1]=LOGENTRY{1,0,[]byte("bar")}
+
+                //MAke a Node .Intialize it with stateMachine
+                raftN3 := &amp;RaftNode{config:raft_config,timerFlag:1,sm:temp_sm3}    //FInally Make Node
+                raftN3.CommitChannel = make(chan interface{},40)
+                log3,err = log.Open("log3")        //Open Log file
+                log3.RegisterSampleEntry(LOGENTRY{})
+                checkError(err)
+                log3.Append(temp_sm3.LOG[0])
+                log3.Append(temp_sm3.LOG[1])
+                go raftN3.check_Inbox(serv) // this routine is checking for other peer Message at Inbox
+                go raftN3.check_SMAction(serv) // this routine is getting actionn from State Machine through Action channel
+                go temp_sm3.processEvent() //start stateMachine
+
+                // FOllowing goroutine will Handle timer for this raftNode
+                now:= time.Now()
+                raftN3.Exp_Time = now.Add(time.Duration(raft_config.ElectionTimeout) * time.Millisecond)
+                go raftN3.timer2()
+                return raftN3</span>;
+        <span class="cov8" title="1">case 4:
+                ch4 := new(Channel)
+                ch4.Action = make(chan interface{},40)
+                ch4.clientCh=make(chan interface{},40)
+                ch4.timeoutCh=make(chan interface{},40)
+                ch4.netCh=make(chan interface{},40)
+                
+                raft_config := &amp;Config{Id: 4, LogDir: "log4", ElectionTimeout: 4200, HeartbeatTimeout: 500}
+                temp_sm4 := new(STATEMACHINE)
+                temp_sm4 = &amp;STATEMACHINE{ID: 4, VOTEDFOR: 6, STATE: "Follower",SMchanels:ch4,NEXTINDEX:[5]int{2,2,2,2,2}}
+                temp_sm4.LOG = make([]LOGENTRY,2)
+                temp_sm4.LOG[0]=LOGENTRY{0,0,[]byte("foo")}
+                temp_sm4.LOG[1]=LOGENTRY{1,0,[]byte("bar")}
+                //temp_sm4.LOG=append(temp_sm4.LOG,LOGENTRY{0,0,[]byte("foo")})             // Entry in Log
+                
+                raftN4 := &amp;RaftNode{config:raft_config,timerFlag:1,sm:temp_sm4}    //FInally Make Node
+                raftN4.CommitChannel = make(chan interface{},40)
+                log4, _ = log.Open("log4")        //Open Log file
+                log4.RegisterSampleEntry(LOGENTRY{})
+                checkError(err)
+                log4.Append(temp_sm4.LOG[0])
+                log4.Append(temp_sm4.LOG[1])
+                
+                go raftN4.check_Inbox(serv) // this routine is checking for other peer Message at Inbox
+                go raftN4.check_SMAction(serv) // this routine is getting actionn from State Machine through Action channel
+                go temp_sm4.processEvent() //start stateMachine
+                now:= time.Now()
+                //raftN4.timerFlag=1        
+                raftN4.Exp_Time = now.Add(time.Duration(raft_config.ElectionTimeout) * time.Millisecond)
+                go raftN4.timer2()
+                return raftN4</span>;
+                <span class="cov0" title="0">default : return new(RaftNode)</span>
+                
+        }
+        
+}
+
+// Following function will iterate over all RaftNode and it will return RaftNode who is Leader.
+func getLeader(rns []*RaftNode) *RaftNode<span class="cov8" title="1">{
+  for</span><span class="cov8" title="1">{
+        for i:=0;i&lt;5;i++</span><span class="cov8" title="1">{
+                if strings.Compare(rns[i].sm.STATE,"LEADER")==1</span><span class="cov8" title="1">{
+                        return rns[i];
+                }</span>
+        }
+  }        
+        <span class="cov0" title="0">return nil</span>
+}
+
+// Following function handles Incoming at Inbox from other peers.It reads those Event and forwards to StateMachine
+func (rn *RaftNode) check_Inbox(node cluster.Server) <span class="cov8" title="1">{
+        for </span><span class="cov8" title="1">{
+                env := &lt;-node.Inbox()
+                switch env.Msg.(type) </span>{
+                // this packet is APPENDENTRIESRESP:
+                <span class="cov8" title="1">case APPENDENTRIESRESP:
+                        temp := env.Msg.(APPENDENTRIESRESP)
+                        rn.sm.SMchanels.netCh &lt;- temp</span>
+                
+                //this packet is APPENDENTRIESREQ:
+                <span class="cov8" title="1">case APPENDENTRIESREQ:
+                        temp := env.Msg.(APPENDENTRIESREQ)
+                        rn.sm.SMchanels.netCh &lt;- temp</span>
+           
+                // this packet is VOTERESP
+                <span class="cov8" title="1">case VOTERESP:
+                   //        fmt.Println("VOTERESp");
+                        temp := env.Msg.(VOTERESP)
+                        rn.sm.SMchanels.netCh &lt;- temp</span>
+        
+                <span class="cov8" title="1">case VOTEREQ:
+                        temp := env.Msg.(VOTEREQ)
+                        rn.sm.SMchanels.netCh &lt;- temp</span>
+                }
+        }
+} //End of check_Inbox function
+
+//This goroutine receives Action coming from StateMAchine and take Actions Accordingly.
+
+func (rn *RaftNode) check_SMAction(node cluster.Server) <span class="cov8" title="1">{
+        for </span><span class="cov8" title="1">{
+                actionEvent := &lt;-rn.sm.SMchanels.Action
+                switch actionEvent.(type) </span>{
+                        // If Action is SEND Event.It will forward that Message to respective peers
+                <span class="cov8" title="1">case SEND:
+                        tempEvent := actionEvent.(SEND)
+                        //fmt.Println("-&gt; ",tmp)
+                        id := tempEvent.ID_TOSEND
+                        mid := getMsgId(tempEvent.EVENT)
+                        msgid := int64(mid)
+                        if id == 500 </span><span class="cov8" title="1">{ // 100 means it  is a broadcast request
+                                node.Outbox() &lt;- &amp;cluster.Envelope{Pid: cluster.BROADCAST, MsgId: msgid, Msg: tempEvent.EVENT}
+                        }</span><span class="cov8" title="1"> else {
+                                node.Outbox() &lt;- &amp;cluster.Envelope{Pid: id, MsgId: msgid, Msg: tempEvent.EVENT}
+                        }</span>
+                <span class="cov8" title="1">case COMMIT:</span>
+                
+                // This will update StateMachine Timeout period.                
+                <span class="cov8" title="1">case ALARM:
+                        tempEvent := actionEvent.(ALARM)
+                        t := tempEvent.TIME
+                        now := time.Now()
+                        rn.Exp_Time = now.Add(time.Duration(t) * time.Millisecond)
+                        rn.timerFlag = 1</span>
+                <span class="cov8" title="1">case LOGSTORE:
+                        tempEvent := actionEvent.(LOGSTORE)
+                        index:=tempEvent.INDEX
+                        data:=tempEvent.DATA.COMMAND
+                        CI:=COMMITINFO{Index:int64(index),Data:data}
+                        rn.CommitChannel &lt;-CI
+                    rn.writeLog(tempEvent)</span>
+                }
+        }
+} //End of check_SMAction() function
+
+// This function is holding Timeout logic of stateMachine.
+
+func (rn *RaftNode) timer2() <span class="cov8" title="1">{
+        for </span><span class="cov8" title="1">{        fmt.Print("")
+
+                        if rn.timerFlag == 1 </span><span class="cov8" title="1">{
+                        for </span><span class="cov8" title="1">{
+                                now2:= time.Now()
+                                if now2.After(rn.Exp_Time) </span><span class="cov8" title="1">{
+                                        //        fmt.Println("$$$$")
+
+                                        rn.sm.SMchanels.timeoutCh &lt;- TIMEOUT{}
+                                        rn.timerFlag = 0
+                                        break</span>
+                                }
+                        }
+                }
+        }
+}
+
+// This function is writing Log at Disk for RaftNode
+func (rn *RaftNode) writeLog(ls LOGSTORE)<span class="cov8" title="1">{
+        switch rn.sm.ID</span>{
+        <span class="cov8" title="1">case 0:        
+        fmt.Println("0")
+        log0.Append(ls.DATA)</span>
+        <span class="cov8" title="1">case 1: 
+        fmt.Println("1")
+        log1.Append(ls.DATA)</span>
+        
+        <span class="cov8" title="1">case 2: 
+        fmt.Println("2")
+        log2.Append(ls.DATA)</span>
+        
+        <span class="cov8" title="1">case 3: 
+        fmt.Println("3")
+        log3.Append(ls.DATA)</span>
+        
+        <span class="cov8" title="1">case 4: 
+        fmt.Println("4")
+        log4.Append(ls.DATA)</span>
+        
+        }
+}
+
+func getMsgId(temp interface{}) int <span class="cov8" title="1">{
+        switch temp.(type) </span>{
+        <span class="cov8" title="1">case APPENDENTRIESRESP:
+                return 1</span>
+        <span class="cov8" title="1">case APPENDENTRIESREQ:
+                return 2</span>
+        <span class="cov8" title="1">case VOTERESP:
+                return 3</span>
+        <span class="cov8" title="1">case VOTEREQ:
+                return 4</span>
+
+        }
+        <span class="cov0" title="0">return 81</span>
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible = document.getElementById('file0');
+		files.addEventListener('change', onChange, false);
+		function onChange() {
+			visible.style.display = 'none';
+			visible = document.getElementById(files.value);
+			visible.style.display = 'block';
+			window.scrollTo(0, 0);
+		}
+	})();
+	</script>
+</html>

@@ -1,0 +1,11 @@
+tab="--tab"
+cmd2="bash -c 'go run *.go';bash"
+foo=""
+
+for i in 1 2 ... n; do
+      foo+=($tab -e "$cmd")         
+done
+
+gnome-terminal "${foo[@]}"
+
+exit 0

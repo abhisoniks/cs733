@@ -1,392 +1,466 @@
 package main
-
 import (
-"strconv"
+	"fmt"
+	//"github.com/cs733-iitb/log"
 )
 
-var Action = make(chan interface{}, 40)
-var clientCh = make(chan interface{}, 40)
-var timeoutCh = make(chan interface{}, 40)
-var netCh = make(chan interface{}, 40)
-
-type logEntry struct {
-	index   int
-	term    int
-	command string
-}
-
-type StateMachine struct {
-	leaderId      int
-	state         string
-	votedFor      int // 0 if not voted for anyone else Id of candidate to whom voted
-	currentTerm   int
-	currentCommit int // it tell index upto which log is commited
-	log           []logEntry
-	commitIndex   int
-	lastApplied   int //index of highest log entry applied to state machine
-	nextIndex     [5]int
-	matchIndex    [5]int
-	voteGranted   [2]int //First index counts number of positive voteResponse.second index counts number of negative voteResponse
-}
-
-func defaultSet() { // default value of state machine variable when state Machine is first time starte
-	sm.state = "Follower"
-	sm.votedFor = 6
-}
-
-type Append struct {
-	a []byte
-}
-
-type AppendEntriesReq struct {  //AppendEntriesReq(term int,leaderId int, prevLogIndex int,prevLogTerm int,entries[] string,leaderCommit int)
-	term         int
-	leaderId     int
-	prevLogIndex int
-	prevLogTerm  int
-	entries      []logEntry
-	leaderCommit int
-}
-type AppendEntriesResp struct {
-	term     int
-	senderId int
-	AEResp   bool
-}
-type Timeout struct {
-}
-
-type VoteReq struct {
-	term         int //candidate’s term
-	candidateId  int //	int candidate requesting vote
-	lastLogIndex int //index of candidate’s last log entry (§5.4)
-	lastLogTerm  int //of candidate’s last log entry (§5.4)
-
-}
-type VoteResp struct {
-	term     int  // for which term this voteRes is
-	voteResp bool //tells voteResponse yes or No
-}
-
-func (sm *StateMachine) processEvent() {
-	select {
-
-	case appendMsg := <-clientCh:
-		append1, _ := appendMsg.(Append) //convert it to Append
-		sm.Append(append1)
-	case peerMsg := <-netCh:
-		switch peerMsg.(type) {
-		case AppendEntriesReq: //if coming through channel is struct of type AppendEntriesReq
-			appendER, _ := peerMsg.(AppendEntriesReq)
-			sm.AppendEntriesReq(appendER)
-		case VoteReq:
-			voteRQ, _ := peerMsg.(VoteReq)
-			sm.VoteReq(voteRQ)
-		case VoteResp:
-			vRes, _ := peerMsg.(VoteResp)
-			sm.VoteResp(vRes)
-		case AppendEntriesResp:
-			ApRes, _ := peerMsg.(AppendEntriesResp)
-			sm.AppendEntriesResp(ApRes)
-		}
-	//if coming through channel is struct of type AppendEntriesReq	}
-	case <-timeoutCh:
-		sm.Timeout()
-	}
-}
-
-func (sm *StateMachine) Append(appendEvent Append) {
-	switch sm.state {
-	case "Follower":
-		Action <- "Commit(" + string(appendEvent.a) + ",Leader is at id 4)"
-	case "Candidate":
-		Action <- "Commit(" + string(appendEvent.a) + ",error)"
-	case "Leader": //Logstore ,Send AppendEntriesRPC ,reset Alarm
-		pIndex, pTerm, _ := sm.getPrev()
-		newCommand := string(appendEvent.a[:])
-		sm.log = append(sm.log, logEntry{pIndex + 1, pTerm, newCommand})
-		Action <- [3]string{"LogStore(" + strconv.Itoa(pIndex+1) + ")", "for each server p send(p,AppendEntriesReq(" + strconv.Itoa(sm.currentTerm) + "," + strconv.Itoa(0) + "," + strconv.Itoa(pIndex) + "," + strconv.Itoa(pTerm) + "," + "log[" + strconv.Itoa(pIndex) + ":]" + "," + strconv.Itoa(sm.commitIndex) + ")", "Alarm(t)"}
-
-	}
-}
-
-func (sm *StateMachine) AppendEntriesReq(AER_Event AppendEntriesReq) {
-	switch sm.state {
-	case "Follower":
-		if len(sm.log) == 0 { //machine has no entry at all ,copy leader's log as it is
-			sm.log = make([]logEntry, 0)
-			for j := 0; j < len(AER_Event.entries); j++ {
-				sm.log = append(sm.log, AER_Event.entries[j])
+func (sm *STATEMACHINE) processEvent() {
+	for {
+		select {
+		case appendMsg := <-sm.SMchanels.clientCh:
+			append1, _ := appendMsg.(APPEND) //convert it to Append
+			sm.Append(append1)
+		case peerMsg := <-sm.SMchanels.netCh:
+			switch peerMsg.(type) {
+			case APPENDENTRIESREQ: //if coming through channel is struct of type APPENDENTRIESREQ
+				appendER, _ := peerMsg.(APPENDENTRIESREQ)
+				sm.APPENDENTRIESREQ(appendER)
+			case VOTEREQ:
+				voteRQ, _ := peerMsg.(VOTEREQ)
+				sm.VOTEREQ(voteRQ)
+			case VOTERESP:
+				vRes, _ := peerMsg.(VOTERESP)
+				sm.VOTERESP(vRes)
+			case APPENDENTRIESRESP:
+				ApRes, _ := peerMsg.(APPENDENTRIESRESP)
+				sm.APPENDENTRIESRESP(ApRes)
 			}
-			sm.currentTerm = AER_Event.entries[len(AER_Event.entries)-1].term //set current term equal to leader's term
-			sm.votedFor = 6
-			i := strconv.Itoa(sm.currentTerm)
-			Action <- [4]string{"true", i, strconv.Itoa(0), "Alarm(t)"} // 0 is sender id
+		//if coming through channel is struct of type APPENDENTRIESREQ	}
+		case <-sm.SMchanels.timeoutCh:
+				sm.Timeout()
+		}
+	} // for loop end
+}
+
+
+func (sm *STATEMACHINE) Append(appendEVENT APPEND) {
+	switch sm.STATE {
+	case "Follower":
+		c := COMMIT{DATA: string(appendEVENT.A), ERROR: 404}
+		sm.SMchanels.Action <- c
+	case "Candidate":
+		c := COMMIT{DATA: string(appendEVENT.A), ERROR: 404}
+		sm.SMchanels.Action <- c
+	case "Leader": //LOGSTORE ,SEND AppendENTRIESRPC ,reset ALARM
+		pINDEX, pTERM, _ := sm.getPrev()
+		newCommand := appendEVENT.A[:]
+		sm.LOG = append(sm.LOG, LOGENTRY{pINDEX + 1, pTERM, newCommand})
+		t:=LOGENTRY{pINDEX+1,pTERM,appendEVENT.A}
+		l := LOGSTORE{INDEX:pINDEX+1,DATA:t}
+		//COMMITINFO{DATA:t,index:pINDEX+1,Err:0}
+		sm.SMchanels.Action <- l
+		apr := APPENDENTRIESREQ{TERM: sm.CURRENTTERM, LEADERID: sm.ID, PREVLOGINDEX: pINDEX, PREVLOGTERM: pTERM, ENTRIES: sm.LOG, LEADERCOMMIT: sm.COMMITINDEX}
+		fmt.Println("apr to send",apr)
+		sm.SMchanels.Action <- SEND{ID_TOSEND: 500, EVENT: apr}
+		sm.SMchanels.Action <- ALARM{TIME: 500}
+		//	sm.SMchanels.Action <- [3]string{"LOGSTORE(" + strconv.Itoa(pINDEX+1) + ")", "for each server p SEND(p,APPENDENTRIESREQ(" + strconv.Itoa(sm.CURRENTTERM) + "," + strconv.Itoa(0) + "," + strconv.Itoa(pINDEX) + "," + strconv.Itoa(pTERM) + "," + "log[" + strconv.Itoa(pINDEX) + ":]" + "," + strconv.Itoa(sm.COMMITINDEX) + ")", "ALARM(t)"}
+
+	}
+}
+
+func (sm *STATEMACHINE) APPENDENTRIESREQ(AER_EVENT APPENDENTRIESREQ) {
+	switch sm.STATE {
+	case "Follower":
+		prevINDEX, _, _ := sm.getPrev()
+        if AER_EVENT.TERM < sm.CURRENTTERM || AER_EVENT.PREVLOGINDEX > prevINDEX { // leader's TERM is less than CURRENTTERM
+			sm.SMchanels.Action <- SEND{ID_TOSEND: sm.LEADERID, EVENT: APPENDENTRIESRESP{TERM: sm.CURRENTTERM, SENDERID: sm.ID, AERESP: false}}
+			t := sm.getElectionTime()
+			sm.SMchanels.Action <- ALARM{TIME: t}
 			break
 		}
-		prevIndex, _, _ := sm.getPrev()
-		if AER_Event.term < sm.currentTerm || AER_Event.prevLogIndex > prevIndex { // leader's Term is less than currentTerm
-			i := strconv.Itoa(sm.currentTerm)
-			Action <- [4]string{"false", i, strconv.Itoa(0), "Alarm(t)"} // send cuurentTerm to leader to update itself
-			break
-		}
-		if AER_Event.term >= sm.currentTerm && AER_Event.entries == nil { //check if its a heartbeat check previous term and index
-			if sm.log[AER_Event.prevLogIndex].term == AER_Event.prevLogTerm { //in both case reset Timeout
-				sm.currentTerm = AER_Event.term
-				i := strconv.Itoa(sm.currentTerm)
-				Action <- [4]string{"true", i, strconv.Itoa(0), "Alarm(t)"}
-				sm.commitIndex = AER_Event.leaderCommit //update your commitIndex
+		if AER_EVENT.TERM >= sm.CURRENTTERM && AER_EVENT.ENTRIES == nil { //check if its a heartbeat check previous TERM and INDEX
+			if sm.LOG[AER_EVENT.PREVLOGINDEX].TERM == AER_EVENT.PREVLOGTERM { //in both case reset Timeout
+				sm.CURRENTTERM = AER_EVENT.TERM
+				//	i := strconv.Itoa(sm.CURRENTTERM)
+				//	sm.SMchanels.Action <- [4]string{"true", i, strconv.Itoa(0), "ALARM(t)"}
+				sm.LEADERID = AER_EVENT.LEADERID
+				sm.SMchanels.Action <- SEND{ID_TOSEND: sm.LEADERID, EVENT: APPENDENTRIESRESP{TERM: sm.CURRENTTERM, SENDERID: sm.ID, AERESP: true}}
+				t := sm.getElectionTime()
+				sm.SMchanels.Action <- ALARM{TIME: t}
+				sm.COMMITINDEX = AER_EVENT.LEADERCOMMIT //update your COMMITINDEX
 			} else {
-				i := strconv.Itoa(sm.currentTerm)
-				Action <- [4]string{"false", i, strconv.Itoa(0), "Alarm(t)"}
+				
+				sm.SMchanels.Action <- SEND{ID_TOSEND: sm.LEADERID, EVENT: APPENDENTRIESRESP{TERM: sm.CURRENTTERM, SENDERID: sm.ID, AERESP: false}}
+				t := sm.getElectionTime()
+				sm.SMchanels.Action <- ALARM{TIME: t}
+
 			}
 		} else { // this is not Heartbeat message.
-			pIndex := AER_Event.prevLogIndex
-			pTerm := sm.log[pIndex].term
-			pCommand := sm.log[pIndex].command
-			if AER_Event.prevLogTerm != pTerm {
-				i := strconv.Itoa(sm.currentTerm) // reply false
-				Action <- [4]string{"false", i, strconv.Itoa(0), "Alarm(t)"}
-			} else if AER_Event.prevLogTerm == pTerm && pCommand == AER_Event.entries[pIndex].command { //all three matches
-				for k := pIndex + 1; k < len(AER_Event.entries); k++ { // whereever matches copy whole log of leader and set currentTerm equal to leader's term
-					sm.log = append(sm.log, AER_Event.entries[k])
+		   
+			pINDEX := AER_EVENT.PREVLOGINDEX
+			pTERM := sm.LOG[pINDEX].TERM
+			pCommand := string(sm.LOG[pINDEX].COMMAND)
+			if AER_EVENT.PREVLOGTERM != pTERM {
+				sm.SMchanels.Action <- SEND{ID_TOSEND: sm.LEADERID, EVENT: APPENDENTRIESRESP{TERM: sm.CURRENTTERM, SENDERID: sm.ID, AERESP: false}}
+				t := sm.getElectionTime()
+				sm.SMchanels.Action <- ALARM{TIME: t}
+			} else if AER_EVENT.PREVLOGTERM == pTERM && pCommand == string(AER_EVENT.ENTRIES[pINDEX].COMMAND) { //all three matches
+				var k int
+				for k = pINDEX + 1; k < len(AER_EVENT.ENTRIES); k++ { // whereever matches copy whole log of leader and set CURRENTTERM equal to leader's TERM
+					sm.LOG = append(sm.LOG, AER_EVENT.ENTRIES[k])
+					sm.SMchanels.Action <- LOGSTORE{k,AER_EVENT.ENTRIES[k]}
 				}
-				sm.commitIndex = AER_Event.leaderCommit
-				sm.currentTerm = AER_Event.term
-				sm.votedFor = 6 // for this term votedFor is null
-				i := strconv.Itoa(sm.currentTerm)
-				Action <- [4]string{"true", i, strconv.Itoa(0), "Alarm(t)"}
-			} else if AER_Event.prevLogTerm == pTerm && pCommand != AER_Event.entries[pIndex].command { //command does not matches
+				//t:=AER_EVENT.ENTRIES[k]
+				//COMMITINFO{DATA:t,index:k,Err:0}
 				
-				i := strconv.Itoa(sm.currentTerm)
-				Action <- [4]string{"false", i, strconv.Itoa(0), "Alarm(t)"}
+				sm.COMMITINDEX = AER_EVENT.LEADERCOMMIT
+				sm.CURRENTTERM = AER_EVENT.TERM
+				sm.VOTEDFOR = 6 // for this TERM votedFor is null
+				sm.LEADERID = AER_EVENT.LEADERID
+				sm.SMchanels.Action <- SEND{ID_TOSEND: sm.LEADERID, EVENT: APPENDENTRIESRESP{TERM: sm.CURRENTTERM, SENDERID: sm.ID, AERESP: true}}
+				ti := sm.getElectionTime()
+				sm.SMchanels.Action <- ALARM{TIME: ti}
+			} else if AER_EVENT.PREVLOGTERM == pTERM && pCommand != string(AER_EVENT.ENTRIES[pINDEX].COMMAND) { //command does not matches
+	
+				sm.SMchanels.Action <- SEND{ID_TOSEND: sm.LEADERID, EVENT: APPENDENTRIESRESP{TERM: sm.CURRENTTERM, SENDERID: sm.ID, AERESP: false}}
+				t := sm.getElectionTime()
+				sm.SMchanels.Action <- ALARM{TIME: t}
 			}
 		}
 	case "Leader": //
-		if AER_Event.term < sm.currentTerm { // leader's Term is less than currentTerm
-			i := strconv.Itoa(sm.currentTerm)
-			Action <- [4]string{"false", i, strconv.Itoa(0), "Alarm(t)"} // send cuurentTerm to leader to update itself
+		if AER_EVENT.TERM < sm.CURRENTTERM { // leader's TERM is more than CURRENTTERM
+			sm.SMchanels.Action <- SEND{ID_TOSEND: sm.LEADERID, EVENT: APPENDENTRIESRESP{TERM: sm.CURRENTTERM, SENDERID: sm.ID, AERESP: false}}
+			sm.SMchanels.Action <- ALARM{TIME: 500}
 			break
 		} else {
-			sm.state = "Follower"
-			sm.voteGranted = [2]int{0, 0}
-			sm.votedFor = 6
-			i := strconv.Itoa(sm.currentTerm)
-			Action <- [4]string{"false", i, strconv.Itoa(0), "Alarm(t)"} // send cuurentTerm to leader to update itself
+			sm.STATE = "Follower"
+			////fmt.Println("New state is ", sm.STATE, " ", sm)
+			sm.VOTEGRANTED = [2]int{0, 0}
+			sm.VOTEDFOR = 6
+			sm.SMchanels.Action <- SEND{ID_TOSEND: sm.LEADERID, EVENT: APPENDENTRIESRESP{TERM: sm.CURRENTTERM, SENDERID: sm.ID, AERESP: false}}
+			t := sm.getElectionTime()
+			sm.SMchanels.Action <- ALARM{TIME: t}
 		}
 
 	case "Candidate":
-		prevIndex, _, _ := sm.getPrev()
-		if AER_Event.term < sm.currentTerm  { // leader's Term is less than currentTerm
-			i := strconv.Itoa(sm.currentTerm)
-			Action <- [4]string{"false", i, strconv.Itoa(0), "Alarm(t)"} // send cuurentTerm to leader to update itself
-			break
+		prevINDEX, _, _ := sm.getPrev()
+		if AER_EVENT.TERM < sm.CURRENTTERM { // leader's TERM is less than CURRENTTERM
+			sm.SMchanels.Action <- SEND{ID_TOSEND: sm.LEADERID, EVENT: APPENDENTRIESRESP{TERM: sm.CURRENTTERM, SENDERID: sm.ID, AERESP: false}}
+			t := sm.getElectionTime()
+			sm.SMchanels.Action <- ALARM{TIME: t}
+			return
 		}
-		pIndex := AER_Event.prevLogIndex
-		pTerm := sm.log[pIndex].term
-		_ = sm.log[pIndex].command
-		if AER_Event.term >= sm.currentTerm && AER_Event.entries == nil { //check if its a heartbeat check previous term and index
-			if  (pTerm >= AER_Event.prevLogTerm &&  AER_Event.prevLogIndex >= prevIndex){
-				sm.commitIndex = AER_Event.leaderCommit //update your commitIndex
-				sm.state = "Follower"
-				sm.currentTerm = AER_Event.term
-				sm.voteGranted = [2]int{0, 0}
-				sm.votedFor = 6
-				i := strconv.Itoa(sm.currentTerm)
-				Action <- [4]string{"true", i, strconv.Itoa(0), "Alarm(t)"}
+		pINDEX := AER_EVENT.PREVLOGINDEX
+		var pTERM int
+		if len(sm.LOG) > 0 { //initial setUp
+			pTERM = sm.LOG[pINDEX].TERM
+		} else {
+			pTERM = 0
+		}
+		//_ = sm.LOG[pINDEX].command
+		if AER_EVENT.TERM >= sm.CURRENTTERM && AER_EVENT.ENTRIES == nil { //check if its a heartbeat check previous TERM and INDEX
+			if pTERM >= AER_EVENT.PREVLOGTERM && AER_EVENT.PREVLOGINDEX >= prevINDEX {
+				sm.COMMITINDEX = AER_EVENT.LEADERCOMMIT //update your COMMITINDEX
+				sm.STATE = "Follower"
+				sm.CURRENTTERM = AER_EVENT.TERM
+				sm.VOTEGRANTED = [2]int{0, 0}
+				sm.VOTEDFOR = 6
+				sm.LEADERID = AER_EVENT.LEADERID
+				//	i := strconv.Itoa(sm.CURRENTTERM)
+				//sm.SMchanels.Action <- [4]string{"true", i, strconv.Itoa(0), "ALARM(t)"}
+				sm.SMchanels.Action <- SEND{ID_TOSEND: sm.LEADERID, EVENT: APPENDENTRIESRESP{TERM: sm.CURRENTTERM, SENDERID: sm.ID, AERESP: true}}
+				t := sm.getElectionTime()
+				sm.SMchanels.Action <- ALARM{TIME: t}
 			} else {
-				i := strconv.Itoa(sm.currentTerm)
-				Action <- [4]string{"false", i, strconv.Itoa(0), "Alarm(t)"}
+				
+				sm.SMchanels.Action <- SEND{ID_TOSEND: sm.LEADERID, EVENT: APPENDENTRIESRESP{TERM: sm.CURRENTTERM, SENDERID: sm.ID, AERESP: false}}
+				t := sm.getElectionTime()
+				sm.SMchanels.Action <- ALARM{TIME: t}
 			}
 		} else { // this is not Heartbeat message.
-			pIndex := AER_Event.prevLogIndex
-			pTerm := sm.log[pIndex].term
-			pCommand := sm.log[pIndex].command
+			pINDEX := AER_EVENT.PREVLOGINDEX
+			pTERM := sm.LOG[pINDEX].TERM
+			pCommand := string(sm.LOG[pINDEX].COMMAND)
 
-			if AER_Event.prevLogTerm != pTerm {
-			
-				i := strconv.Itoa(sm.currentTerm) // reply false
-				Action <- [4]string{"false", i, strconv.Itoa(0), "Alarm(t)"}
-			} else if AER_Event.prevLogTerm == pTerm && pCommand == AER_Event.entries[pIndex].command { //all three matches
-				for k := pIndex + 1; k < len(AER_Event.entries); k++ { // whereever matches copy whole log of leader and set currentTerm equal to leader's term
-					sm.log = append(sm.log, AER_Event.entries[k])
+			if AER_EVENT.PREVLOGTERM != pTERM {
+				sm.SMchanels.Action <- SEND{ID_TOSEND: sm.LEADERID, EVENT: APPENDENTRIESRESP{TERM: sm.CURRENTTERM, SENDERID: sm.ID, AERESP: false}}
+				t := sm.getElectionTime()
+				sm.SMchanels.Action <- ALARM{TIME: t}
+			} else if AER_EVENT.PREVLOGTERM == pTERM && pCommand == string(AER_EVENT.ENTRIES[pINDEX].COMMAND) { //all three matches
+				//var k int
+				for k := pINDEX + 1; k < len(AER_EVENT.ENTRIES); k++ { // whereever matches copy whole log of leader and set CURRENTTERM equal to leader's TERM
+					sm.LOG = append(sm.LOG, AER_EVENT.ENTRIES[k])
+					fmt.Println("LOGSTORE++")
+					sm.SMchanels.Action <- LOGSTORE{k,AER_EVENT.ENTRIES[k]}
 				}
-				
-				sm.state = "Follower"
-				sm.commitIndex = AER_Event.leaderCommit
-				sm.currentTerm = AER_Event.term
-				sm.votedFor = 6 // for this term votedFor is null
-				i := strconv.Itoa(sm.currentTerm)
-				Action <- [4]string{"true", i, strconv.Itoa(0), "Alarm(t)"}
+				//t:=AER_EVENT.ENTRIES[k]
+				//COMMITINFO{DATA:t,index:k,Err:0}
+				sm.STATE = "Follower"
+				sm.COMMITINDEX = AER_EVENT.LEADERCOMMIT
+				sm.CURRENTTERM = AER_EVENT.TERM
+				sm.VOTEDFOR = 6 // for this TERM votedFor is null
+				sm.LEADERID = AER_EVENT.LEADERID
+				sm.SMchanels.Action <- SEND{ID_TOSEND: sm.LEADERID, EVENT: APPENDENTRIESRESP{TERM: sm.CURRENTTERM, SENDERID: sm.ID, AERESP: true}}
+				ti := sm.getElectionTime()
+				sm.SMchanels.Action <- ALARM{TIME: ti}
 
-			} else if AER_Event.prevLogTerm == pTerm && pCommand != AER_Event.entries[pIndex].command {
-				
-				i := strconv.Itoa(sm.currentTerm)
-				Action <- [4]string{"false", i, strconv.Itoa(0), "Alarm(t)"}
+			} else if AER_EVENT.PREVLOGTERM == pTERM && pCommand != string(AER_EVENT.ENTRIES[pINDEX].COMMAND) {
+				aers := APPENDENTRIESRESP{TERM: sm.CURRENTTERM, SENDERID: sm.ID, AERESP: false}
+				sm.SMchanels.Action <- SEND{ID_TOSEND: sm.LEADERID, EVENT: aers}
+
 			}
 		}
 	}
 }
 
-func (sm *StateMachine) Timeout() {
-	switch sm.state {
-	case "Follower": //change state increase term by 1 and start election and set election timer
-		sm.currentTerm = sm.currentTerm + 1
-		pIndex, pTerm, _ := sm.getPrev()
-		sm.state = "Candidate"
-		sm.votedFor = 6 // vote to itself
-		Action <- [2]string{"for all peer p send(p,VoteReq(" + strconv.Itoa(sm.currentTerm) + "," + strconv.Itoa(0) + "," + strconv.Itoa(pIndex) + "," + strconv.Itoa(pTerm) + "))", "Alarm(t)"}
-	case "Leader": // send heart beat message and reset timer
-		pIndex, pTerm, _ := sm.getPrev()
-		Action <- [2]string{"for all peer p send(p,AppendEntriesReq(" + strconv.Itoa(sm.currentTerm) + "," + strconv.Itoa(sm.leaderId) + "," + strconv.Itoa(pIndex) + "," + strconv.Itoa(pTerm) + "," + "nil," + strconv.Itoa(sm.commitIndex) + "))", "Alarm(t)"}
-	case "Candidate": //increase currentTerm ask for vote again and reset Alarm
-		sm.currentTerm = sm.currentTerm + 1
-		pIndex, pTerm, _ := sm.getPrev()
-		sm.state = "Candidate"
-		sm.votedFor = 6 // vote to itself first
-		Action <- [2]string{"for all peer p send(p,VoteReq(" + strconv.Itoa(sm.currentTerm) + "," + strconv.Itoa(0) + "," + strconv.Itoa(pIndex) + "," + strconv.Itoa(pTerm) + "))", "Alarm(t)"}
+func (sm *STATEMACHINE) Timeout() {
+    //	fmt.Println("TIMEOUT")
+	switch sm.STATE {
+	case "Follower": //change state increase TERM by 1 and start election and set election timer
+		sm.CURRENTTERM = sm.CURRENTTERM + 1
+		pINDEX, pTERM, _ := sm.getPrev()
+		sm.STATE = "Candidate"
+		sm.VOTEDFOR = sm.ID // vote to itself
+		sm.VOTEGRANTED[0] = 1
+		VR := VOTEREQ{TERM: sm.CURRENTTERM, CANDIDATEID: sm.ID, LASTLOGINDEX: pINDEX, LASTLOGTERM: pTERM}
+		sm.SMchanels.Action <- SEND{ID_TOSEND: 500, EVENT: VR}
+		t := sm.getElectionTime()
+		sm.SMchanels.Action <- ALARM{TIME: t}
+	//	sm.SMchanels.Action <- [2]string{"for all peer p SEND(p,VOTEREQ(" + strconv.Itoa(sm.CURRENTTERM) + "," + strconv.Itoa(0) + "," + strconv.Itoa(pINDEX) + "," + strconv.Itoa(pTERM) + "))", "ALARM(t)"}
+	case "Leader": // SEND heart beat message and reset timer
+		pINDEX, pTERM, _ := sm.getPrev()
+		//fmt.Println("2")
+		aer := APPENDENTRIESREQ{TERM: sm.CURRENTTERM, LEADERID: sm.ID, PREVLOGINDEX: pINDEX, PREVLOGTERM: pTERM, ENTRIES: nil, LEADERCOMMIT: sm.COMMITINDEX}
+		sm.SMchanels.Action <- SEND{ID_TOSEND: 500, EVENT: aer}
+		sm.SMchanels.Action <- ALARM{TIME: 500}
+	//sm.SMchanels.Action <- [2]string{"for all peer p SEND(p,APPEE=E," ",sm)
+	case "Candidate":
+		sm.STATE = "Candidate"
+		sm.CURRENTTERM = sm.CURRENTTERM + 1
+		sm.VOTEDFOR = sm.ID // vote to itself first
+		sm.VOTEGRANTED[0] = 1
+		//fmt.Println("New state is ", sm.STATE, " ", sm)
+
+		pINDEX, pTERM, _ := sm.getPrev()
+	    //	fmt.Println("VoteRequest send",sm)
+		VR := VOTEREQ{TERM: sm.CURRENTTERM, CANDIDATEID: sm.ID, LASTLOGINDEX: pINDEX, LASTLOGTERM: pTERM}
+
+		sm.SMchanels.Action <- SEND{ID_TOSEND: 500, EVENT: VR}
+		t := sm.getElectionTime()
+
+		sm.SMchanels.Action <- ALARM{TIME: t}
+		//		sm.SMchanels.Action <- [2]string{"for all peer p SEND(p,VOTEREQ(" + strconv.Itoa(sm.CURRENTTERM) + "," + strconv.Itoa(0) + "," + strconv.Itoa(pINDEX) + "," + strconv.Itoa(pTERM) + "))", "ALARM(t)"}
 	}
 }
 
-func (sm *StateMachine) AppendEntriesResp(AER_Event AppendEntriesResp) {
-	switch sm.state {
-	case "Follower": //ignore it
-	case "Candidate": //ignore it
+func (sm *STATEMACHINE) APPENDENTRIESRESP(AER_EVENT APPENDENTRIESRESP) {
+	//fmt.Println("AppendEntriesResponse RECEIVED ", sm, " ", "response is", AER_EVENT)
+	switch sm.STATE {
+	case "Follower": break//ignore it
+	case "Candidate": break//ignore it
 	case "Leader":
-		if AER_Event.AEResp == true {
-			lastIndex := sm.log[len(sm.log)-1].index
-			sm.nextIndex[AER_Event.senderId] = lastIndex + 1
-			sm.matchIndex[AER_Event.senderId] = lastIndex
+		if AER_EVENT.AERESP == true {
+			//fmt.Println("true")
+			if len(sm.LOG) > 0 { // when leader has log .
+				lastINDEX := sm.LOG[len(sm.LOG)-1].INDEX
+				sm.NEXTINDEX[AER_EVENT.SENDERID] = lastINDEX + 1
+				sm.MATCHINDEX[AER_EVENT.SENDERID] = lastINDEX
+			} else { //leader has no log New set up
+				lastINDEX := 0
+				sm.NEXTINDEX[AER_EVENT.SENDERID] = lastINDEX
+				sm.MATCHINDEX[AER_EVENT.SENDERID] = lastINDEX
+
+			}
 		} else {
-			sm.nextIndex[AER_Event.senderId] -= 1
-			newpIndex := sm.log[sm.nextIndex[AER_Event.senderId]-1].index //calculate new previous index to send with AppenEntriesRPC
-			newpTerm := sm.log[sm.nextIndex[AER_Event.senderId]-1].term   //calculate new previous term to send with AppenEntriesRPC
-			Action <- [2]string{"Send(" + strconv.Itoa(AER_Event.senderId) + ",AppendEntriesReq(" + strconv.Itoa(sm.currentTerm) + "," + strconv.Itoa(0) + "," + strconv.Itoa(newpIndex) + "," + strconv.Itoa(newpTerm) + "," + "log[" + strconv.Itoa(sm.nextIndex[AER_Event.senderId]-1) + ":]" + "," + strconv.Itoa(sm.commitIndex) + ")", "Alarm(t)"}
+			//fmt.Println("false")
+			sm.NEXTINDEX[AER_EVENT.SENDERID] -= 1
+			var newpINDEX, newpTERM int
+			newpINDEX = 0
+			newpTERM = 0
+
+			if len(sm.LOG) > 0 {
+				newpINDEX = sm.LOG[sm.NEXTINDEX[AER_EVENT.SENDERID]].INDEX //calculate new previous INDEX to SEND with AppenENTRIESRPC
+				newpTERM = sm.LOG[sm.NEXTINDEX[AER_EVENT.SENDERID]].TERM   //calculate new previous TERM to SEND with AppenENTRIESRPC
+			//	fmt.Println("AEREQST SEND")
+				aer := APPENDENTRIESREQ{TERM: sm.CURRENTTERM, LEADERID: sm.ID, PREVLOGINDEX: newpINDEX, PREVLOGTERM: newpTERM, ENTRIES: sm.LOG[(sm.NEXTINDEX[AER_EVENT.SENDERID]):], LEADERCOMMIT: sm.COMMITINDEX}
+				sm.SMchanels.Action <- SEND{ID_TOSEND: AER_EVENT.SENDERID, EVENT: aer}
+			} else {
+				newpINDEX = 0
+				newpTERM = 0
+			
+				aer := APPENDENTRIESREQ{TERM: sm.CURRENTTERM, LEADERID: sm.ID, PREVLOGINDEX: newpINDEX, PREVLOGTERM: newpTERM, ENTRIES: nil, LEADERCOMMIT: sm.COMMITINDEX}
+				sm.SMchanels.Action <- SEND{ID_TOSEND: AER_EVENT.SENDERID, EVENT: aer}
+			}
+			sm.SMchanels.Action <- ALARM{TIME: 500}
+
+			//sm.SMchanels.Action <- [2]string{"SEND(" + strconv.Itoa(AER_EVENT.SENDERID) + ",APPENDENTRIESREQ(" + strconv.Itoa(sm.CURRENTTERM) + "," + strconv.Itoa(0) + "," + strconv.Itoa(newpINDEX) + "," + strconv.Itoa(newpTERM) + "," + "log[" + strconv.Itoa(sm.NEXTINDEX[AER_EVENT.SENDERID]-1) + ":]" + "," + strconv.Itoa(sm.COMMITINDEX) + ")", "ALARM(t)"}
 		}
 
 		count := make(map[int]int)
 		for i := 0; i < 5; i++ {
 			var sum int = 0
-			if sm.matchIndex[i] > sm.commitIndex {
+			if sm.MATCHINDEX[i] > sm.COMMITINDEX {
 				for j := 0; j < 5; j++ {
-					if sm.matchIndex[j] == sm.matchIndex[i] {
+					if sm.MATCHINDEX[j] == sm.MATCHINDEX[i] {
 						sum = sum + 1
 					}
 				}
-				count[sm.matchIndex[i]] = sum
+				count[sm.MATCHINDEX[i]] = sum
 			} else {
-				count[sm.matchIndex[i]] = 0
+				count[sm.MATCHINDEX[i]] = 0
 			}
 		}
-		temp := sm.commitIndex
+		temp := sm.COMMITINDEX
 		for key, value := range count {
 			if key > temp && value >= 3 {
 				temp = key
 			}
 		}
-		if temp != sm.commitIndex { //commitIndex is changed
-			sm.commitIndex = temp
-			Action <- "Commit(" + strconv.Itoa(sm.commitIndex) + "," + sm.log[len(sm.log)-1].command + ")"
+		if temp != sm.COMMITINDEX { //COMMITINDEX is changed
+			sm.COMMITINDEX = temp
+			sm.SMchanels.Action <- COMMIT{INDEX: sm.COMMITINDEX, DATA: string(sm.LOG[len(sm.LOG)-1].COMMAND)}
 		}
 	}
 }
 
-func (sm *StateMachine) VoteReq(VRQ_Event VoteReq) {
-	cID := strconv.Itoa(VRQ_Event.candidateId)
-	cT := strconv.Itoa(sm.currentTerm)
-	pIndex, _, _ := sm.getPrev() //will return previouscommand,previousId and previousTerm
-	switch sm.state {
+func (sm *STATEMACHINE) VOTEREQ(VRQ_EVENT VOTEREQ) {
+	//fmt.Println("VOTEREQ")
+	pINDEX, _, _ := sm.getPrev() //will return previouscommand,previousId and previousTERM
+	//fmt.Println("VoteReq came ", sm, " ", "sender", "=", VRQ_EVENT)
+	switch sm.STATE {
 	case "Follower":
-		if VRQ_Event.term >= sm.currentTerm && (sm.votedFor == 6 || sm.votedFor == VRQ_Event.candidateId) {
-			if VRQ_Event.lastLogIndex >= pIndex {
-				Action <- "Send(" + cID + ",VoteResp(" + cT + ",voteGranted=yes))"
-				sm.votedFor = VRQ_Event.candidateId
+		if (sm.VOTEDFOR == 6) && VRQ_EVENT.TERM >= sm.CURRENTTERM   {
+			if VRQ_EVENT.LASTLOGINDEX >= pINDEX {
+				//	sm.SMchanels.Action <- "SEND(" + cID + ",VOTERESP(" + cT + ",VOTEGRANTED=yes))"
+				V_res := VOTERESP{TERM: sm.CURRENTTERM, VOTERESP: true}
+				sm.SMchanels.Action <- SEND{ID_TOSEND: VRQ_EVENT.CANDIDATEID, EVENT: V_res}
+				sm.VOTEDFOR = VRQ_EVENT.CANDIDATEID
+			//	fmt.Println("response send=", V_res)
 			} else {
-				Action <- "Send(" + cID + ",VoteResp(" + cT + ",voteGranted=No))"
+				//sm.SMchanels.Action <- "SEND(" + cID + ",VOTERESP(" + cT + ",VOTEGRANTED=No))"
+				V_res := VOTERESP{sm.CURRENTTERM, false}
+				sm.SMchanels.Action <- SEND{VRQ_EVENT.CANDIDATEID, V_res}
+			//	fmt.Println("response send=", V_res)
 			}
 		} else {
-			Action <- "Send(" + cID + ",VoteResp(" + cT + ",voteGranted=No))"
+			//sm.SMchanels.Action <- "SEND(" + cID + ",VOTERESP(" + cT + ",VOTEGRANTED=No))"
+			V_res := VOTERESP{sm.CURRENTTERM, false}
+			sm.SMchanels.Action <- SEND{VRQ_EVENT.CANDIDATEID, V_res}
+
 		}
 
 	case "Leader":
-		if VRQ_Event.term >= sm.currentTerm {
-			sm.state = "Follower" // some of initialization before going in Follower state
-			sm.votedFor = 6
-			sm.voteGranted = [2]int{0, 0}
-			Action <- "Send(" + cID + ",VoteResp(" + cT + ",voteGranted=No))"
+		if VRQ_EVENT.TERM >= sm.CURRENTTERM {
+			sm.STATE = "Follower" // some of initialization before going in Follower state
+						//fmt.Println("New state is ", sm.STATE, " ", sm)
+
+			sm.VOTEDFOR = 6
+			sm.VOTEGRANTED = [2]int{0, 0}
+			V_res := VOTERESP{sm.CURRENTTERM, false}
+			sm.SMchanels.Action <- SEND{VRQ_EVENT.CANDIDATEID, V_res}
+		//	fmt.Println("response send=", V_res)
 		} else {
-			Action <- "Send(" + cID + ",VoteResp(" + cT + ",voteGranted=No))"
+			//sm.SMchanels.Action <- "SEND(" + cID + ",VOTERESP(" + cT + ",VOTEGRANTED=No))"
+			V_res := VOTERESP{sm.CURRENTTERM, false}
+			sm.SMchanels.Action <- SEND{VRQ_EVENT.CANDIDATEID, V_res}
+		//	fmt.Println("response send=", V_res)
 		}
 
 	case "Candidate":
-		if VRQ_Event.term > sm.currentTerm && VRQ_Event.lastLogIndex >= pIndex { //if voteFrom higher term
-			sm.state = "Follower"
-			sm.voteGranted = [2]int{0, 0}
-			sm.votedFor = VRQ_Event.candidateId
-			sm.currentTerm = VRQ_Event.term
-			//Action<-;
-			Action <- [2]string{"Send(" + cID + ",VoteResp(" + strconv.Itoa(sm.currentTerm) + ",voteGranted=yes))", "Alarm(t)"}
+		if VRQ_EVENT.TERM > sm.CURRENTTERM { //if voteFrom higher TERM
+			sm.STATE = "Follower"
+			//fmt.Println("New state is ", sm.STATE, " ", sm)
+			sm.VOTEGRANTED = [2]int{0, 0}
+			sm.VOTEDFOR = 6 //VRQ_EVENT.CANDIDATEID
+			sm.CURRENTTERM = VRQ_EVENT.TERM
+			V_res := VOTERESP{sm.CURRENTTERM, false}
+			sm.SMchanels.Action <- SEND{VRQ_EVENT.CANDIDATEID, V_res}
+			t := sm.getElectionTime()
+			sm.SMchanels.Action <- ALARM{TIME: t}
+		//	fmt.Println("response send=", V_res)
 		} else {
-			Action <- "Send(" + cID + ",VoteResp(" + cT + ",voteGranted=No))"
+			V_res := VOTERESP{sm.CURRENTTERM, false}
+			sm.SMchanels.Action <- SEND{VRQ_EVENT.CANDIDATEID, V_res}
+		//	fmt.Println("response send=", V_res)
 		}
 	}
 }
 
-func (sm *StateMachine) VoteResp(VRS_Event VoteResp) {
-	switch sm.state {
-	case "Follower": //ignore it
-	case "Leader": // ignore it
+func (sm *STATEMACHINE) VOTERESP(VRS_EVENT VOTERESP) {
+	//fmt.Println("---> Vote Me")
+
+	switch sm.STATE {
+	case "Follower": break
+	case "Leader":  // fmt.Println("old voteRes");
+	break
 	case "Candidate":
 
-		if VRS_Event.term > sm.currentTerm { // If term is greater than sm.term go to Follower state & reInitialize its timer
-
-			sm.state = "Follower"
-			sm.votedFor = 6 // 6 means for this term it has not give vote to anyone
-			sm.currentTerm = VRS_Event.term
-			Action <- "Alarm(t)"
+		if VRS_EVENT.TERM > sm.CURRENTTERM { // If TERM is greater than sm.TERM go to Follower state & reInitialize its timer
+			sm.STATE = "Follower"
+			sm.VOTEDFOR = 6 // 6 means for this TERM it has not give vote to anyone
+			sm.CURRENTTERM = VRS_EVENT.TERM
+			//sm.SMchanels.Action <- "ALARM(t)"
+			t := sm.getElectionTime()
+			sm.SMchanels.Action <- ALARM{TIME: t}
+			return
 		}
-		if VRS_Event.term <= sm.currentTerm && VRS_Event.voteResp == true {
-
-			sm.voteGranted[0] += 1
+		if VRS_EVENT.TERM <= sm.CURRENTTERM && VRS_EVENT.VOTERESP == true {
+			sm.VOTEGRANTED[0] += 1
 		}
-		if VRS_Event.term <= sm.currentTerm && VRS_Event.voteResp == false {
-
-			sm.voteGranted[1] += 1
+		if VRS_EVENT.TERM <= sm.CURRENTTERM && VRS_EVENT.VOTERESP == false {
+			sm.VOTEGRANTED[1] += 1
 		}
-		if sm.voteGranted[0] >= 3 { // become Leader
-			pIndex, pTerm, _ := sm.getPrev()
-			sm.voteGranted = [2]int{0, 0} //reintialize voteGranted
-			sm.votedFor = 6               //reintialize voteFor
-			sm.state = "Leader"
-			sm.leaderId = 0
-			//pIndex,pTerm,_:=sm.getPrev()
-			Action <- [2]string{"for all peer p send(p,AppendEntriesReq(" + strconv.Itoa(sm.currentTerm) + "," + strconv.Itoa(0) + "," + strconv.Itoa(pIndex) + "," + strconv.Itoa(pTerm) + "," + "nil," + strconv.Itoa(sm.commitIndex) + ")", "Alarm(t)"} //Reintialize timer
+		if sm.VOTEGRANTED[0] >= 3 { // become Leader
+			pINDEX, pTERM, _ := sm.getPrev()
+			sm.VOTEGRANTED = [2]int{0, 0} //reintialize VOTEGRANTED
+			sm.VOTEDFOR = 6               //reintialize voteFor
+			sm.STATE = "Leader"
+			sm.LEADERID = sm.ID
+			sm.LEADERID = 0
+			
+			aer := APPENDENTRIESREQ{sm.CURRENTTERM, sm.LEADERID, pINDEX, pTERM, nil, sm.COMMITINDEX}
+		//	fmt.Println("send AppendEntries Request by",sm.ID," ",aer,)
+			sm.SMchanels.Action <- SEND{0, aer}
+			sm.SMchanels.Action <- ALARM{TIME: 500}
+		}
+		if sm.VOTEGRANTED[1] >= 3 { //become Follower here
+			sm.VOTEGRANTED = [2]int{0, 0} //reintialize VOTEGRANTED
+			sm.VOTEDFOR = 6               //reintialize voteFor
+			sm.STATE = "Follower"
+			//fmt.Println("New state is ", sm.STATE, " ", sm)
+			//sm.SMchanels.Action <- "ALARM(t)"
+			t := sm.getElectionTime()
+			sm.SMchanels.Action <- ALARM{TIME: t}
 
 		}
-		if sm.voteGranted[1] >= 3 { //become Follower here
-			sm.voteGranted = [2]int{0, 0} //reintialize voteGranted
-			sm.votedFor = 6               //reintialize voteFor
-			sm.state = "Follower"
-			Action <- "Alarm(t)"
-
-		}
-		if sm.voteGranted[1] == 2 && sm.voteGranted[0] == 2 { //voteSplit  && Re-electionn
-			pIndex, pTerm, _ := sm.getPrev()
-			sm.currentTerm = sm.currentTerm + 1
-			sm.votedFor = 0 // vote to itself.sm own id is 0
-			sm.voteGranted = [2]int{0, 0}
-			Action <- [2]string{"for all peer p send(p,VoteReq(" + strconv.Itoa(sm.currentTerm) + "," + strconv.Itoa(0) + "," + strconv.Itoa(pIndex) + "," + strconv.Itoa(pTerm) + "))", "Alarm(t)"}
-
+		if sm.VOTEGRANTED[1] == 2 && sm.VOTEGRANTED[0] == 2 { //voteSplit  && Re-electionn
+			pINDEX, pTERM, _ := sm.getPrev()
+			sm.CURRENTTERM = sm.CURRENTTERM + 1
+			sm.VOTEDFOR = 0 // vote to itself.sm own id is 0
+			sm.VOTEGRANTED = [2]int{0, 0}
+			//sm.SMchanels.Action <- [2]string{"for all peer p SEND(p,VOTEREQ(" + strconv.Itoa(sm.CURRENTTERM) + "," + strconv.Itoa(0) + "," + strconv.Itoa(pINDEX) + "," + strconv.Itoa(pTERM) + "))", "ALARM(t)"}
+			vr := VOTEREQ{sm.CURRENTTERM, sm.ID, pINDEX, pTERM}
+			sm.SMchanels.Action <- SEND{0, vr}
+			t := sm.getElectionTime()
+			sm.SMchanels.Action <- ALARM{TIME: t}
 		}
 	}
 }
 
-func (sm *StateMachine) getPrev() (int, int, string) { //this function returns previous log index log term and previous command
+func (sm *STATEMACHINE) getPrev() (int, int, string) { //this function returns previous log INDEX log TERM and previous command
 	var prevI int
 	var prevT int
 	var prevC string
-	for i := 0; i < len(sm.log); i++ {
-		prevI = sm.log[i].index
-		prevT = sm.log[i].term
-		prevC = sm.log[i].command
+	for i := 0; i < len(sm.LOG); i++ {
+		prevI = sm.LOG[i].INDEX
+		prevT = sm.LOG[i].TERM
+		prevC = string(sm.LOG[i].COMMAND)
 	}
 	return prevI, prevT, prevC
+}
+
+func (sm *STATEMACHINE) getElectionTime() int {
+	switch sm.ID {
+	case 0:
+		return 2200
+	case 1:
+		return 2700
+	case 2:
+		return 3200
+	case 3:
+		return 3700
+	case 4:
+		return 4200
+	}
+	return 0
 }
