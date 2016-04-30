@@ -54,7 +54,7 @@ func (sm *STATEMACHINE) APPENDENTRIESREQ(AER_EVENT APPENDENTRIESREQ) {
 	switch sm.STATE {
 	case "Follower":
 		prevINDEX, prevTERM, prevCommand := sm.getPrev()                             
-		if AER_EVENT.TERM < sm.CURRENTTERM 
+		if AER_EVENT.TERM < sm.CURRENTTERM{
 			sm.SMchanels.Action <- SEND{ID_TOSEND: AER_EVENT.LEADERID, EVENT: APPENDENTRIESRESP{TERM: sm.CURRENTTERM, SENDERID: sm.ID, AERESP: false}}
 			t := sm.getElectionTime()
 			sm.SMchanels.Action <- ALARM{TIME: t}
