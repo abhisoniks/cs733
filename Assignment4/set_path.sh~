@@ -1,0 +1,6 @@
+source set_path.sh
+export GOROOT=$HOME/go
+export PATH=$PATH:$GOROOT/bin
+export GOPATH=$HOME/work
+
+

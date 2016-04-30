@@ -1,0 +1,10 @@
+{"Peers":[
+	    {"Id": 0, "Address": "localhost:9700"},
+            {"Id": 1, "Address": "localhost:9701"},
+            {"Id": 2, "Address": "localhost:9702"},
+            {"Id": 3, "Address": "localhost:9703"},
+            {"Id": 4, "Address": "localhost:9704"}
+        ],
+		    "InboxSize": 10000000,
+   			"OutboxSize":10000000
+    }
