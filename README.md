@@ -1,4 +1,4 @@
-# Implementation of Distributed File server based on raft consenus protocol
+# Implementation of Distributed File server based on Raft consenus protocol
 ### Aim :- Distributed File Server
 Aim of project is to build a Distributed File Server. A File server based on raft consenus protocol. This distributed file server
 is consist of 5 servers. Each have there own raft node and state machine. Project was accomplished in form of assignment where each assignment
